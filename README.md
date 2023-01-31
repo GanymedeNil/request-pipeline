@@ -56,7 +56,7 @@ In this extension I have filtered out css and js content and only allow requests
 
 ## Install
 
-- Later you can install it directly from the chrome extension store.
+- [chrome web store](https://chrome.google.com/webstore/detail/request-pipeline/kkaplobblnfnadlodpgdehhieofppead)
 - If you want to use it right away, you can clone this repository, then click the Load unzipped extensions button in the chrome extension manager and select the plugin directory in the window that opens to use it.
 
 ## Use
