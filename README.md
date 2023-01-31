@@ -1,5 +1,7 @@
-# Request Pipeline
-
+<p align="center">
+  <img src="./images/icon-128.png">
+  <h1 align="center">Request Pipeline</h1>
+</p>
 This is a chrome extension that forwards the content of network requests on web pages to the processing server.This extension can better help development engineers or test engineers understand the specifics of interface requests and responses in web pages.
 
 ## Under the hood
@@ -75,8 +77,8 @@ The request sent by the extension is **POST**, and the data format is **JSON**. 
 | FIELD         | TYPE                                                         | NOTE                                                         |
 | ------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | **cookies**   | **array**[ [Cookie](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-Cookie) ] | https://chromedevtools.github.io/devtools-protocol/tot/Network/#method-getCookies |
-|  **request **       | [Request](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-Request) | https://chromedevtools.github.io/devtools-protocol/tot/Network/#event-requestWillBeSent |
-|  **response **      | [Response](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-Response) | https://chromedevtools.github.io/devtools-protocol/tot/Network/#event-responseReceived |
+|  **request**       | [Request](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-Request) | https://chromedevtools.github.io/devtools-protocol/tot/Network/#event-requestWillBeSent |
+|  **response**      | [Response](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-Response) | https://chromedevtools.github.io/devtools-protocol/tot/Network/#event-responseReceived |
 | **response_body** | **map**                                                          | https://chromedevtools.github.io/devtools-protocol/tot/Network/#method-getResponseBody |
 
 
@@ -92,5 +94,7 @@ https://chromedevtools.github.io/devtools-protocol/tot/Network/
 ## Thanks
 
 [Pipeline icons created by Becris - Flaticon](https://www.flaticon.com/free-icons/pipeline)
+
 [Chrome Extension: "No resource with given identifier found" when trying to Network.getResponseBody](https://stackoverflow.com/questions/47962104/chrome-extension-no-resource-with-given-identifier-found-when-trying-to-netwo)
+
 [Chrome Extension - How to get HTTP Response Body?](https://stackoverflow.com/questions/18534771/chrome-extension-how-to-get-http-response-body)
