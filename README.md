@@ -44,7 +44,7 @@ The three main events I use in this extension are `Network.requestWillBeSent`, `
 
 `Network.requestWillBeSent` in this event I get the request submit data.
 
-`Network.responseReceived` in this event I get response data.
+`Network.responseReceived` in this event I get response data and cookies.
 
 `Network.loadingFinished` In this event, I get the response body data through the `Network.getResponseBody` method, because this is the last of all events.
 
