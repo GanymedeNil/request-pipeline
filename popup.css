@@ -1,0 +1,18 @@
+body{
+    min-height: 100px;
+    min-width: 200px;
+}
+
+.m{
+    margin: 10px;
+}
+
+.mx{
+    margin-left: 10px;
+    margin-right: 10px;
+}
+
+.my{
+    margin-bottom: 10px;
+    margin-top: 10px;
+}

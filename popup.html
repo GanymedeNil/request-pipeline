@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Request Pipeline</title>
+    <link href="./popup.css" rel="stylesheet">
+</head>
+<body class="mx">
+<div class="my">
+    <label class="localize" data-localize="selectTabs">Select Tabs:
+        <select name="tabs" id="tabs">
+            <option value="-1">select</option>
+        </select>
+    </label>
+</div>
+
+<div class="my">
+    <label class="localize" data-localize="server">
+        Server Address:
+        <input type="text" id="server" value="http://127.0.0.1:6789">
+    </label>
+</div>
+
+
+<script src="./popup.js" type="module"></script>
+
+</body>
+</html>
