@@ -102,5 +102,5 @@ function sendData(data) {
 }
 
 function filter(url){
-    return url.startsWith("http") && !url.request.url.endsWith('css') && !url.request.url.endsWith('js')
+    return url.startsWith("http") && !url.endsWith('css') && !url.endsWith('js')
 }
