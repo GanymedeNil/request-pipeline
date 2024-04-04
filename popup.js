@@ -7,11 +7,21 @@ for (const tab of tabs) {
     option.value = tab.id;
     tabsSelectDom.add(option);
 }
+const localServer = localStorage.getItem("server");
+if(localServer){
+    serverDom.value = localServer;
+}
+serverDom.addEventListener('change',  (e)=> {
+    const serverDom = document.getElementById("server")
+    const server = serverDom.value;
+    localStorage.setItem("server",server);
+});
+
 tabsSelectDom.addEventListener('change',  (e)=> {
+    const serverDom = document.getElementById("server")
     const server = serverDom.value;
     (async ()=>{
         const response = await chrome.runtime.sendMessage({id:e.target.value,server:server});
-        console.log(response)
     })();
 
 });

@@ -82,7 +82,6 @@ function allEventHandler(debuggeeId, message, params) {
             if(response){
                 request.set("response_body",response)
                 requests.set(params.requestId,request)
-                console.log(request)
                 sendData(request)
                 requests.delete(params.requestId)
             }else{
@@ -97,6 +96,9 @@ function sendData(data) {
     }
     fetch(server,{
         method:'post',
+        headers:{
+            'Content-Type':'application/json'
+        },
         body:JSON.stringify(Object.fromEntries(data))
     })
 }
