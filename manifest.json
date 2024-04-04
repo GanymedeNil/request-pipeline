@@ -1,6 +1,6 @@
 {
   "name": "Request Pipeline",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "manifest_version": 3,
   "description": "This is an extension that forwards web interface request information to a specified server",
   "icons": {
