@@ -13,7 +13,8 @@
     "format": "prettier --write .",
     "typecheck": "tsc -p tsconfig.json",
     "check": "npm run lint && npm run typecheck && npm test",
-    "package": "node scripts/package.js"
+    "package": "node scripts/package.js",
+    "store-assets": "node scripts/store-assets.js"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
