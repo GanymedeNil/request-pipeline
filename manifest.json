@@ -9,15 +9,8 @@
     "48": "images/icon-48.png",
     "128": "images/icon-128.png"
   },
-  "host_permissions": [
-    "http://*/*",
-    "https://*/*"
-  ],
-  "permissions": [
-    "tabs",
-    "debugger",
-    "storage"
-  ],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "permissions": ["tabs", "debugger", "storage"],
   "background": {
     "service_worker": "background.js",
     "type": "module"

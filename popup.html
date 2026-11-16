@@ -1,73 +1,84 @@
 <!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Request Pipeline</title>
-    <link href="./popup.css" rel="stylesheet">
-</head>
-<body>
-<header>
-    <h1>Request Pipeline</h1>
-    <span id="live" class="live" hidden>REC</span>
-</header>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Request Pipeline</title>
+        <link href="./popup.css" rel="stylesheet" />
+    </head>
+    <body>
+        <header>
+            <h1>Request Pipeline</h1>
+            <span id="live" class="live" hidden>REC</span>
+        </header>
 
-<section>
-    <label class="field">
-        <span>Tab</span>
-        <select id="tab"></select>
-    </label>
-    <button id="toggle" type="button" class="primary">Start capture</button>
-    <p id="status" class="status" role="status"></p>
-    <p id="error" class="error" role="alert" hidden></p>
-</section>
+        <section>
+            <label class="field">
+                <span>Tab</span>
+                <select id="tab"></select>
+            </label>
+            <button id="toggle" type="button" class="primary">Start capture</button>
+            <p id="status" class="status" role="status"></p>
+            <p id="error" class="error" role="alert" hidden></p>
+        </section>
 
-<section>
-    <label class="field">
-        <span>Server address</span>
-        <input type="text" id="server" data-setting="server" spellcheck="false"
-               placeholder="empty: don't forward" aria-describedby="server-warning">
-    </label>
-    <p id="server-warning" class="warning" hidden></p>
-</section>
+        <section>
+            <label class="field">
+                <span>Server address</span>
+                <input
+                    type="text"
+                    id="server"
+                    data-setting="server"
+                    spellcheck="false"
+                    placeholder="empty: don't forward"
+                    aria-describedby="server-warning"
+                />
+            </label>
+            <p id="server-warning" class="warning" hidden></p>
+        </section>
 
-<details id="options">
-    <summary>Options</summary>
+        <details id="options">
+            <summary>Options</summary>
 
-    <label class="check">
-        <input type="checkbox" data-setting="reloadOnStart">
-        <span>Reload the page when capture starts</span>
-    </label>
-    <label class="check">
-        <input type="checkbox" data-setting="redact">
-        <span>Redact credentials <small>(auth and cookie headers, cookie values)</small></span>
-    </label>
+            <label class="check">
+                <input type="checkbox" data-setting="reloadOnStart" />
+                <span>Reload the page when capture starts</span>
+            </label>
+            <label class="check">
+                <input type="checkbox" data-setting="redact" />
+                <span>Redact credentials <small>(auth and cookie headers, cookie values)</small></span>
+            </label>
 
-    <fieldset>
-        <legend>Forward these resource types</legend>
-        <div id="types" class="chips"></div>
-    </fieldset>
+            <fieldset>
+                <legend>Forward these resource types</legend>
+                <div id="types" class="chips"></div>
+            </fieldset>
 
-    <label class="field">
-        <span>Only URLs matching <small>(one per line, * = anything)</small></span>
-        <textarea data-setting="includeUrls" rows="2" spellcheck="false" placeholder="e.g. */api/*"></textarea>
-    </label>
-    <label class="field">
-        <span>Skip URLs matching</span>
-        <textarea data-setting="excludeUrls" rows="2" spellcheck="false" placeholder="e.g. analytics"></textarea>
-    </label>
-    <div class="row">
-        <label class="field">
-            <span>Methods <small>(empty = all)</small></span>
-            <input type="text" data-setting="methods" spellcheck="false" placeholder="e.g. GET, POST">
-        </label>
-        <label class="field">
-            <span>Max body <small>(KB, 0 = no limit)</small></span>
-            <input type="number" data-setting="maxBodyKB" min="0" step="1">
-        </label>
-    </div>
-</details>
+            <label class="field">
+                <span>Only URLs matching <small>(one per line, * = anything)</small></span>
+                <textarea data-setting="includeUrls" rows="2" spellcheck="false" placeholder="e.g. */api/*"></textarea>
+            </label>
+            <label class="field">
+                <span>Skip URLs matching</span>
+                <textarea
+                    data-setting="excludeUrls"
+                    rows="2"
+                    spellcheck="false"
+                    placeholder="e.g. analytics"
+                ></textarea>
+            </label>
+            <div class="row">
+                <label class="field">
+                    <span>Methods <small>(empty = all)</small></span>
+                    <input type="text" data-setting="methods" spellcheck="false" placeholder="e.g. GET, POST" />
+                </label>
+                <label class="field">
+                    <span>Max body <small>(KB, 0 = no limit)</small></span>
+                    <input type="number" data-setting="maxBodyKB" min="0" step="1" />
+                </label>
+            </div>
+        </details>
 
-<script src="./popup.js" type="module"></script>
-</body>
+        <script src="./popup.js" type="module"></script>
+    </body>
 </html>

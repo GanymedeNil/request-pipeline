@@ -37,7 +37,11 @@ body {
     padding: 12px 14px 14px;
     background: var(--bg);
     color: var(--fg);
-    font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    font:
+        13px/1.4 system-ui,
+        -apple-system,
+        'Segoe UI',
+        sans-serif;
 }
 
 header {
@@ -88,8 +92,8 @@ small {
 }
 
 select,
-input[type="text"],
-input[type="number"],
+input[type='text'],
+input[type='number'],
 textarea {
     width: 100%;
     padding: 6px 8px;

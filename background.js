@@ -1,42 +1,58 @@
-import { CAPTURE_STATE_KEY, DEFAULT_SETTINGS } from './config.js';
+// Service worker: attaches the debugger to the chosen tab, turns Network events into records and
+// forwards them. Capture state lives in chrome.storage.session so it survives worker restarts.
+
+import { CAPTURE_STATE_KEY, DEFAULT_SETTINGS, emptyCaptureState } from './config.js';
 import { createFilter } from './lib/filter.js';
+import { forward } from './lib/forward.js';
+import { buildRecord, limitBodies } from './lib/record.js';
 import { redactRecord } from './lib/redact.js';
+
+/**
+ * @typedef {import('./config.js').Settings} Settings
+ * @typedef {import('./config.js').CaptureState} CaptureState
+ * @typedef {import('./config.js').Message} Message
+ * @typedef {import('./config.js').StatusResponse} StatusResponse
+ * @typedef {import('./lib/record.js').PendingRequest} PendingRequest
+ * @typedef {import('devtools-protocol').Protocol.Network.RequestWillBeSentEvent} RequestWillBeSentEvent
+ * @typedef {import('devtools-protocol').Protocol.Network.ResponseReceivedEvent} ResponseReceivedEvent
+ * @typedef {import('devtools-protocol').Protocol.Network.LoadingFinishedEvent} LoadingFinishedEvent
+ * @typedef {import('devtools-protocol').Protocol.Network.LoadingFailedEvent} LoadingFailedEvent
+ * @typedef {import('devtools-protocol/types/protocol-mapping').ProtocolMapping.Commands} Commands
+ */
 
 // https://chromedevtools.github.io/devtools-protocol/tot/Network
 const PROTOCOL_VERSION = '1.0';
 
-// Version of the forwarded record format. Records sent by 1.0.x and 1.1.x have no schema_version.
-const SCHEMA_VERSION = 1;
-
-const emptyCaptureState = () => ({
-    tabId: null,
-    stats: { forwarded: 0, failed: 0, skipped: 0 },
-    lastSendError: null,
-});
-
-// Shared with the popup through chrome.storage.session; only this service worker writes it.
-// Kept in session storage so it survives service worker restarts but not a browser restart.
+/** Shared with the popup through chrome.storage.session; only this service worker writes it. */
 let capture = emptyCaptureState();
-// requestId -> { meta, request, response, endTime } for requests that haven't finished loading yet.
+/** @type {Map<string, PendingRequest>} Requests that haven't finished loading yet. */
 const pending = new Map();
 
+/** @type {Settings} */
 let settings = { ...DEFAULT_SETTINGS };
 let shouldForward = createFilter(settings);
 
+/** @param {Partial<Settings>} values */
 function applySettings(values) {
     settings = { ...DEFAULT_SETTINGS, ...values };
     shouldForward = createFilter(settings);
 }
 
+/** @type {Promise<unknown>} */
 const ready = Promise.all([
     chrome.storage.session.get(CAPTURE_STATE_KEY).then((stored) => {
-        capture = { ...emptyCaptureState(), ...stored[CAPTURE_STATE_KEY] };
+        capture = { ...emptyCaptureState(), .../** @type {Partial<CaptureState>} */ (stored[CAPTURE_STATE_KEY]) };
     }),
-    chrome.storage.local.get(DEFAULT_SETTINGS).then(applySettings),
+    chrome.storage.local.get(DEFAULT_SETTINGS).then((stored) => applySettings(/** @type {Settings} */ (stored))),
 ]);
 
 // Start/stop/detach are serialized so quick tab switches can't interleave attach and detach.
+/** @type {Promise<unknown>} */
 let stateQueue = Promise.resolve();
+/**
+ * @param {() => Promise<void>} task
+ * @returns {Promise<void>}
+ */
 function serialize(task) {
     const run = stateQueue.then(() => ready).then(task);
     stateQueue = run.catch(() => {});
@@ -46,7 +62,8 @@ function serialize(task) {
 // Listeners are registered at the top level so they are back in place when Chrome restarts
 // the service worker.
 chrome.debugger.onEvent.addListener((source, method, params) => {
-    ready.then(() => handleEvent(source, method, params))
+    ready
+        .then(() => handleEvent(source, method, params))
         .catch((err) => console.error('[request-pipeline] event handling failed', method, err));
 });
 
@@ -64,24 +81,28 @@ chrome.storage.onChanged.addListener((changes, area) => {
         return;
     }
     ready.then(() => {
+        /** @type {Record<string, unknown>} */
         const updated = { ...settings };
         for (const [key, { newValue }] of Object.entries(changes)) {
             if (key in DEFAULT_SETTINGS) {
-                updated[key] = newValue ?? DEFAULT_SETTINGS[key];
+                updated[key] = newValue ?? DEFAULT_SETTINGS[/** @type {keyof Settings} */ (key)];
             }
         }
         applySettings(updated);
     });
 });
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    handleMessage(message).then(
-        sendResponse,
-        (err) => sendResponse({ ok: false, error: err?.message ?? String(err), ...status() }),
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    handleMessage(message).then(sendResponse, (err) =>
+        sendResponse({ ok: false, error: err instanceof Error ? err.message : String(err), ...status() }),
     );
     return true; // respond asynchronously
 });
 
+/**
+ * @param {Message} message
+ * @returns {Promise<StatusResponse>}
+ */
 async function handleMessage(message) {
     switch (message?.type) {
         case 'start':
@@ -94,7 +115,7 @@ async function handleMessage(message) {
             await ready;
             break;
         default:
-            throw new Error(`Unknown message type: ${message?.type}`);
+            throw new Error(`Unknown message type: ${/** @type {{ type?: unknown }} */ (message)?.type}`);
     }
     return { ok: true, ...status() };
 }
@@ -104,6 +125,7 @@ function status() {
 }
 
 // Stats change with every request, so their writes (and the badge) are batched.
+/** @type {ReturnType<typeof setTimeout> | null} */
 let persistTimer = null;
 function schedulePersist() {
     persistTimer ??= setTimeout(() => {
@@ -112,8 +134,10 @@ function schedulePersist() {
 }
 
 async function persistCapture() {
-    clearTimeout(persistTimer);
-    persistTimer = null;
+    if (persistTimer !== null) {
+        clearTimeout(persistTimer);
+        persistTimer = null;
+    }
     updateBadge();
     await chrome.storage.session.set({ [CAPTURE_STATE_KEY]: capture });
 }
@@ -125,17 +149,22 @@ function updateBadge() {
     chrome.action.setBadgeBackgroundColor({ color: lastSendError ? '#d93025' : '#1a73e8' }).catch(() => {});
 }
 
+/** @param {number} n */
 function formatCount(n) {
     return n < 1000 ? String(n) : `${Math.min(Math.floor(n / 1000), 999)}k`;
 }
 
-// Starting a capture resets the stats; stopping keeps them so the popup can show the totals.
+/**
+ * Starting a capture resets the stats; stopping keeps them so the popup can show the totals.
+ * @param {number | null} tabId
+ */
 async function setCaptureTab(tabId) {
     pending.clear();
     capture = tabId === null ? { ...capture, tabId: null } : { ...emptyCaptureState(), tabId };
     await persistCapture();
 }
 
+/** @param {number} tabId */
 async function startCapture(tabId) {
     if (!Number.isInteger(tabId)) {
         throw new Error(`Invalid tab id: ${tabId}`);
@@ -145,15 +174,14 @@ async function startCapture(tabId) {
     }
     await stopCapture();
 
-    const target = { tabId };
-    await chrome.debugger.attach(target, PROTOCOL_VERSION);
+    await chrome.debugger.attach({ tabId }, PROTOCOL_VERSION);
     // Set before Network.enable so the first events aren't dropped by the tab check.
     await setCaptureTab(tabId);
     try {
-        await chrome.debugger.sendCommand(target, 'Network.enable');
+        await cdp(tabId, 'Network.enable', {});
     } catch (err) {
         await setCaptureTab(null);
-        await chrome.debugger.detach(target).catch(() => {});
+        await chrome.debugger.detach({ tabId }).catch(() => {});
         throw err;
     }
     if (settings.reloadOnStart) {
@@ -172,63 +200,86 @@ async function stopCapture() {
     await chrome.debugger.detach({ tabId }).catch(() => {});
 }
 
+/**
+ * Typed wrapper around chrome.debugger.sendCommand.
+ * @template {keyof Commands} M
+ * @param {number} tabId
+ * @param {M} method
+ * @param {NonNullable<Commands[M]['paramsType'][0]>} params
+ * @returns {Promise<Commands[M]['returnType']>}
+ */
+async function cdp(tabId, method, params) {
+    return /** @type {Commands[M]['returnType']} */ (await chrome.debugger.sendCommand({ tabId }, method, params));
+}
+
+/**
+ * @param {chrome.debugger.DebuggerSession} source
+ * @param {string} method
+ * @param {object | undefined} params
+ */
 function handleEvent(source, method, params) {
-    if (source.tabId !== capture.tabId) {
+    const tabId = source.tabId;
+    if (tabId === undefined || tabId !== capture.tabId) {
         return;
     }
     switch (method) {
-        case 'Network.requestWillBeSent':
+        case 'Network.requestWillBeSent': {
+            const event = /** @type {RequestWillBeSentEvent} */ (params);
             // A redirect reuses the requestId; the record follows the latest hop.
-            if (shouldForward(params.request, params.type)) {
-                pending.set(params.requestId, {
-                    meta: {
-                        type: params.type,
-                        documentURL: params.documentURL,
-                        wallTime: params.wallTime,
-                        startTime: params.timestamp,
-                    },
-                    request: params.request,
+            if (shouldForward(event.request, event.type)) {
+                pending.set(event.requestId, {
+                    request: event.request,
+                    resourceType: event.type,
+                    documentURL: event.documentURL,
+                    wallTime: event.wallTime,
+                    startTime: event.timestamp,
                 });
             } else {
-                pending.delete(params.requestId);
+                pending.delete(event.requestId);
             }
             break;
+        }
         case 'Network.responseReceived': {
-            const record = pending.get(params.requestId);
-            if (record) {
-                record.response = params.response;
+            const event = /** @type {ResponseReceivedEvent} */ (params);
+            const entry = pending.get(event.requestId);
+            if (entry) {
+                entry.response = event.response;
             }
             break;
         }
         case 'Network.loadingFinished': {
-            const record = pending.get(params.requestId);
-            if (record) {
-                pending.delete(params.requestId);
-                record.endTime = params.timestamp;
-                finalize(source.tabId, params.requestId, record)
-                    .catch((err) => console.error('[request-pipeline] failed to finalize', record.request.url, err));
+            const event = /** @type {LoadingFinishedEvent} */ (params);
+            const entry = pending.get(event.requestId);
+            if (entry) {
+                pending.delete(event.requestId);
+                entry.endTime = event.timestamp;
+                finalize(tabId, event.requestId, entry).catch((err) =>
+                    console.error('[request-pipeline] failed to finalize', entry.request.url, err),
+                );
             }
             break;
         }
         case 'Network.loadingFailed':
-            pending.delete(params.requestId);
+            pending.delete(/** @type {LoadingFailedEvent} */ (params).requestId);
             break;
     }
 }
 
-// Collects cookies, response body and (if it was too large to be inlined) the request body, then
-// forwards one record. Everything is awaited together so no field can arrive after the send.
-async function finalize(tabId, requestId, record) {
-    const target = { tabId };
-    const { meta, request, response, endTime } = record;
+/**
+ * Collects cookies, the response body and (if it was too large to be inlined) the request body, then
+ * forwards one record. Everything is awaited together so no field can arrive after the send.
+ * @param {number} tabId
+ * @param {string} requestId
+ * @param {PendingRequest} entry
+ */
+async function finalize(tabId, requestId, entry) {
+    const { request, response } = entry;
     const needsPostData = request.hasPostData && request.postData === undefined;
 
     const [cookies, body, postData] = await Promise.allSettled([
-        chrome.debugger.sendCommand(target, 'Network.getCookies', { urls: [response?.url ?? request.url] }),
-        chrome.debugger.sendCommand(target, 'Network.getResponseBody', { requestId }),
-        needsPostData
-            ? chrome.debugger.sendCommand(target, 'Network.getRequestPostData', { requestId })
-            : Promise.resolve(null),
+        cdp(tabId, 'Network.getCookies', { urls: [response?.url ?? request.url] }),
+        cdp(tabId, 'Network.getResponseBody', { requestId }),
+        needsPostData ? cdp(tabId, 'Network.getRequestPostData', { requestId }) : Promise.resolve(null),
     ]);
 
     if (body.status === 'rejected') {
@@ -238,77 +289,38 @@ async function finalize(tabId, requestId, record) {
         schedulePersist();
         return;
     }
-
-    let data = {
-        schema_version: SCHEMA_VERSION,
-        request_id: requestId,
-        tab_id: tabId,
-        document_url: meta.documentURL,
-        resource_type: meta.type,
-        // Milliseconds since the epoch when the request was sent.
-        timestamp: meta.wallTime === undefined ? undefined : Math.round(meta.wallTime * 1000),
-        duration_ms: meta.startTime === undefined || endTime === undefined
-            ? undefined
-            : Math.round((endTime - meta.startTime) * 1000),
-        request,
-        response,
-    };
-    if (postData.status === 'fulfilled' && postData.value) {
-        data.request = { ...request, postData: postData.value.postData };
-    } else if (postData.status === 'rejected') {
+    if (postData.status === 'rejected') {
         console.warn('[request-pipeline] could not read request body', request.url, postData.reason?.message);
     }
-    if (cookies.status === 'fulfilled') {
-        data.cookies = cookies.value.cookies;
-    } else {
+    if (cookies.status === 'rejected') {
         console.warn('[request-pipeline] could not read cookies', request.url, cookies.reason?.message);
     }
-    data.response_body = body.value;
 
-    data = limitBodies(data, settings.maxBodyKB * 1024);
+    let record = buildRecord({
+        tabId,
+        requestId,
+        pending: entry,
+        responseBody: body.value,
+        cookies: cookies.status === 'fulfilled' ? cookies.value.cookies : undefined,
+        postData: postData.status === 'fulfilled' ? postData.value?.postData : undefined,
+    });
+    record = limitBodies(record, settings.maxBodyKB * 1024);
     if (settings.redact) {
-        data = redactRecord(data);
+        record = redactRecord(record);
     }
-    await send(data);
-}
 
-// Bodies over the limit are replaced by a marker that keeps their length.
-function limitBodies(data, limit) {
-    if (!(limit > 0)) {
-        return data;
-    }
-    const out = { ...data };
-    const postData = data.request.postData;
-    if (typeof postData === 'string' && postData.length > limit) {
-        out.request = { ...data.request, postData: null, postDataOmitted: 'too_large', postDataLength: postData.length };
-    }
-    const body = data.response_body?.body;
-    if (typeof body === 'string' && body.length > limit) {
-        out.response_body = { ...data.response_body, body: null, omitted: 'too_large', length: body.length };
-    }
-    return out;
-}
-
-async function send(data) {
     const { server } = settings;
     if (!server) {
         return;
     }
-    try {
-        const res = await fetch(server, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-        });
-        if (!res.ok) {
-            throw new Error(`HTTP ${res.status}`);
-        }
+    const result = await forward(server, record);
+    if (result.ok) {
         capture.stats.forwarded++;
         capture.lastSendError = null;
-    } catch (err) {
+    } else {
         capture.stats.failed++;
-        capture.lastSendError = { server, message: err?.message ?? String(err), at: Date.now() };
-        console.warn('[request-pipeline] failed to forward to', server, err);
+        capture.lastSendError = { server, message: result.message, at: Date.now() };
+        console.warn('[request-pipeline] failed to forward to', server, result.message);
     }
     schedulePersist();
 }
