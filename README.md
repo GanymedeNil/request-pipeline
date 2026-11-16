@@ -52,7 +52,7 @@ At this point, all the necessary data are obtained.
 
 ### One more thing
 
-In this extension I have filtered out css and js content and only allow requests starting with http. In fact, you can also capture WebSocket content according to the Debugger documentation, and you are welcome to contribute to the functionality!
+Only http(s) requests are forwarded. Static assets (stylesheets, scripts, images, fonts, media, manifests and CORS preflights) are filtered out by their [resource type](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-ResourceType), so documents, XHR/fetch calls and everything else get through. In fact, you can also capture WebSocket content according to the Debugger documentation, and you are welcome to contribute to the functionality!
 
 ## Install
 
@@ -68,7 +68,9 @@ In this extension I have filtered out css and js content and only allow requests
 1. Clicking on the extension will bring up the popup page for this extension. If you don't see this extension in the extension bar, you need to click on the extension icon (like a puzzle icon) and then find this extension and click on it.
    It is highly recommended that you fix this extension in the extension bar to make it easier to use later (just click on the extension icon and find it in the list and click on the pin button next to it).
 2. This extension has only two actionable options. ***Server Address*** means which processor you want to send the captured request data to. ***Select Tabs*** means the tab you want to capture the request. When you select the corresponding tab, chrome will pop up a "Request Pipeline started debugging this browser" reminder, **in Do not press Cancel during the capture request**.
-3. When you want to stop capturing requests, click the Cancel button on the banner.
+3. When you want to stop capturing requests, choose *not capturing* in the popup or click the Cancel button on the banner.
+
+The server address is saved as you type and applies right away, including to a capture that is already running. Leave it empty to stop forwarding. If forwarding fails (for example, the server isn't running), the popup shows the last error.
 
 ### Data format
 
@@ -80,6 +82,16 @@ The request sent by the extension is **POST**, and the data format is **JSON**. 
 |  **request**       | [Request](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-Request) | https://chromedevtools.github.io/devtools-protocol/tot/Network/#event-requestWillBeSent |
 |  **response**      | [Response](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-Response) | https://chromedevtools.github.io/devtools-protocol/tot/Network/#event-responseReceived |
 | **response_body** | **map**                                                          | https://chromedevtools.github.io/devtools-protocol/tot/Network/#method-getResponseBody |
+
+`request.postData` contains the full request body, including bodies too large for Chrome to include in the event. `cookies` is left out if Chrome couldn't return them. Requests whose response body Chrome no longer has (redirects, evicted buffers) are not forwarded.
+
+## Development
+
+```bash
+npm test
+```
+
+The tests replay Chrome DevTools Protocol event sequences against `background.js` with a fake `chrome` API. They need Node.js 22 or later and no dependencies.
 
 
 
