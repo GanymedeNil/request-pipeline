@@ -201,6 +201,9 @@ export async function openPopup(browser) {
             if (!(await page.$eval('#options', (el) => el.open))) {
                 await page.click('#options summary');
             }
+            // The open state is saved from the asynchronous `toggle` event; newer Chrome fires it
+            // after click() returns, so wait for it before anything reloads the popup.
+            await page.waitForFunction(() => localStorage.getItem('optionsOpen') === '1');
         },
         async screenshot(name) {
             if (!SCREENSHOT_DIR) {
