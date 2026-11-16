@@ -14,10 +14,14 @@
     "typecheck": "tsc -p tsconfig.json",
     "check": "npm run lint && npm run typecheck && npm test",
     "package": "node scripts/package.js",
-    "store-assets": "node scripts/store-assets.js"
+    "store-assets": "node scripts/store-assets.js",
+    "build-site": "node scripts/build-site.js"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@fontsource/unbounded": "^5.3.0",
     "@types/chrome": "^0.3.7",
     "devtools-protocol": "^0.0.1744848",
     "eslint": "^10.15.0",

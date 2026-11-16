@@ -22,6 +22,10 @@ export default [
         languageOptions: { globals: { ...globals.browser, ...extension } },
     },
     {
+        files: ['site/**/*.js'],
+        languageOptions: { globals: { ...globals.browser } },
+    },
+    {
         files: ['test/**/*.js', 'e2e/**/*.js', 'scripts/**/*.js', '*.config.js'],
         languageOptions: { globals: { ...globals.node } },
     },

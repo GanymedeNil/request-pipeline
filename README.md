@@ -2,6 +2,8 @@
   <img src="./images/icon-128.png">
   <h1 align="center">Request Pipeline</h1>
 </p>
+Website: [www.ganymedenil.com/request-pipeline](https://www.ganymedenil.com/request-pipeline/) · [Privacy policy](https://www.ganymedenil.com/request-pipeline/privacy.html) · [Terms](https://www.ganymedenil.com/request-pipeline/terms.html)
+
 This is a chrome extension that forwards the content of network requests on web pages to the processing server.This extension can better help development engineers or test engineers understand the specifics of interface requests and responses in web pages.
 
 ## Under the hood
@@ -164,6 +166,7 @@ npm run test:e2e   # browser tests: loads the extension in Chromium and drives t
 - **Types** are JSDoc comments checked by TypeScript in strict mode (`npm run typecheck`); nothing is compiled.
 - **Unit tests** (`test/`) replay Chrome DevTools Protocol event sequences against `background.js` with a fake `chrome` API.
 - **Browser tests** (`e2e/`) need Python 3 for `examples/receiver.py` and a Chromium build: run `npx playwright install chromium` once, or set `CHROME_PATH` to a Chrome for Testing or Chromium binary (branded Chrome no longer loads unpacked extensions from the command line). `EXTENSION_DIR` loads another directory, such as the unzipped package, and `SCREENSHOT_DIR` saves popup screenshots in light and dark mode.
+- **Website**: `site/` holds the product page, privacy policy and terms. `npm run build-site` assembles it into `dist/site` with self-hosted fonts (the site loads nothing from other domains, and `test/site.test.js` checks that), and the Pages workflow publishes it whenever it changes on `main`.
 - **Packaging** follows what the manifest actually loads, so only those files go into the zip; a reference to a missing file fails the build.
 
 CI runs all of the above on every pull request, with the browser tests on the unzipped package.

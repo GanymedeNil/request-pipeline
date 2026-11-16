@@ -5,7 +5,8 @@
 // examples/receiver.py on the default port. The layouts around them are HTML rendered at the exact
 // sizes the Store asks for.
 //
-// Usage: EXTENSION_DIR=<unpacked release> npm run store-assets
+// Usage: EXTENSION_DIR=<unpacked release> npm run store-assets [-- --popups-only]
+//   --popups-only  only refresh the raw popup screenshots the website uses (popup-*@2x.png)
 //   EXTENSION_DIR  the version being published (default: the repository root)
 //   CHROME_PATH    optional Chrome for Testing / Chromium binary
 
@@ -19,7 +20,7 @@ import { chromium } from 'playwright';
 const ROOT = path.resolve(import.meta.dirname, '..');
 const EXTENSION_DIR = path.resolve(process.env.EXTENSION_DIR ?? ROOT);
 const OUT = path.join(ROOT, 'store/images');
-const SHOP_PORT = 8080;
+const SHOP_PORT = Number(process.env.SHOP_PORT ?? 8080);
 const RECEIVER_PORT = 6789;
 const SHOP = `http://shop.example:${SHOP_PORT}`;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -411,6 +412,14 @@ async function main() {
         const capturing = { ...popupSize(path.join(work, 'popup-capturing.png')), count: forwardedAtShot };
 
         fs.mkdirSync(OUT, { recursive: true });
+        // The website shows the popup on its own (scripts/build-site.js).
+        for (const name of ['popup-capturing', 'popup-options']) {
+            fs.copyFileSync(path.join(work, `${name}.png`), path.join(OUT, `${name}@2x.png`));
+            console.log(`  store/images/${name}@2x.png (680px wide)`);
+        }
+        if (process.argv.includes('--popups-only')) {
+            return;
+        }
         const browser = await chromium.launch(browserOptions);
         try {
             await render(

@@ -1,0 +1,45 @@
+name: Pages
+
+# Publishes the website in site/ to GitHub Pages when it changes on main.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'store/images/popup-options@2x.png'
+      - 'images/**'
+      - 'scripts/build-site.js'
+      - 'package-lock.json'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build-site
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/site
+      - id: deployment
+        uses: actions/deploy-pages@v4

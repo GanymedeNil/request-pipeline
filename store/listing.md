@@ -48,6 +48,12 @@ Bugs and ideas: https://github.com/GanymedeNil/request-pipeline/issues
 
 ## Privacy practices tab
 
+**Privacy policy URL**: replace the termsfeed link with the project's own policy, which describes exactly what the code does:
+
+```
+https://www.ganymedenil.com/request-pipeline/privacy.html
+```
+
 **Single purpose**
 
 ```
@@ -65,6 +71,13 @@ Forward the network requests and responses of a browser tab the user chooses to 
 | Remote code | `No, I am not using remote code.` |
 
 **Data usage**: the current disclosure lists *User activity* and *Website content*. Records can also contain cookies and `Authorization` headers, which the dashboard classes as *Authentication information*; consider ticking it too. Data is sent only to the endpoint the user configures, never to the developer.
+
+## Store listing tab: links
+
+| Field | Value |
+| --- | --- |
+| Homepage URL | `https://www.ganymedenil.com/request-pipeline/` |
+| Support URL | `https://github.com/GanymedeNil/request-pipeline/issues` |
 
 ## Images
 
