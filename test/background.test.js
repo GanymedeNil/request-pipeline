@@ -45,8 +45,17 @@ test('forwards one record per finished request, with metadata', async () => {
     assert.equal(sent[0].url, 'http://127.0.0.1:6789');
     const body = sent[0].body;
     assert.deepEqual(Object.keys(body), [
-        'schema_version', 'request_id', 'tab_id', 'document_url', 'resource_type', 'timestamp', 'duration_ms',
-        'request', 'response', 'cookies', 'response_body',
+        'schema_version',
+        'request_id',
+        'tab_id',
+        'document_url',
+        'resource_type',
+        'timestamp',
+        'duration_ms',
+        'request',
+        'response',
+        'cookies',
+        'response_body',
     ]);
     assert.equal(body.schema_version, 1);
     assert.equal(body.request_id, 'r1');
@@ -69,7 +78,10 @@ test('a server address changed during capture applies to the next request', asyn
     replayRequest(fake, 1, { requestId: 'r2', url: 'https://a.test/2' });
     await settle();
 
-    assert.deepEqual(sent.map((s) => s.url), ['http://old.test/', 'http://new.test/']);
+    assert.deepEqual(
+        sent.map((s) => s.url),
+        ['http://old.test/', 'http://new.test/'],
+    );
 });
 
 test('an empty server address turns forwarding off', async () => {
@@ -92,7 +104,10 @@ test('capture keeps working after the service worker restarts', async () => {
     replayRequest(fake, 5, { requestId: 'r1', url: 'https://a.test/1' });
     await settle();
 
-    assert.deepEqual(sent.map((s) => s.url), ['http://saved.test/']);
+    assert.deepEqual(
+        sent.map((s) => s.url),
+        ['http://saved.test/'],
+    );
     const state = await status(fake);
     assert.equal(state.tabId, 5);
     assert.equal(state.stats.forwarded, 4);
@@ -166,31 +181,48 @@ test('URL include/exclude patterns and methods filter requests', async () => {
     }
     await settle();
 
-    assert.deepEqual(sent.map((s) => s.body.request_id), ['in-get', 'in-post', 'substring']);
+    assert.deepEqual(
+        sent.map((s) => s.body.request_id),
+        ['in-get', 'in-post', 'substring'],
+    );
 });
 
 test('request bodies CDP did not inline are fetched', async () => {
     const fake = await startedOn(1);
     replayRequest(fake, 1, {
-        requestId: 'big', url: 'https://a.test/upload', method: 'POST', request: { hasPostData: true },
+        requestId: 'big',
+        url: 'https://a.test/upload',
+        method: 'POST',
+        request: { hasPostData: true },
     });
     replayRequest(fake, 1, {
-        requestId: 'small', url: 'https://a.test/form', method: 'POST', request: { hasPostData: true, postData: 'a=1' },
+        requestId: 'small',
+        url: 'https://a.test/form',
+        method: 'POST',
+        request: { hasPostData: true, postData: 'a=1' },
     });
     await settle();
 
     const bodies = Object.fromEntries(sent.map((s) => [s.body.request.url, s.body.request.postData]));
     assert.deepEqual(bodies, { 'https://a.test/upload': 'post-big', 'https://a.test/form': 'a=1' });
     const postDataCalls = fake.commands.filter((c) => c.method === 'Network.getRequestPostData');
-    assert.deepEqual(postDataCalls.map((c) => c.params.requestId), ['big']);
+    assert.deepEqual(
+        postDataCalls.map((c) => c.params.requestId),
+        ['big'],
+    );
 });
 
 test('bodies over the size limit are replaced by a marker', async () => {
     const fake = await startedOn(1, { local: { maxBodyKB: 1 } });
-    fake.handlers['Network.getResponseBody'] = (target, { requestId }) =>
-        ({ body: requestId === 'large' ? 'x'.repeat(1025) : 'small', base64Encoded: false });
+    fake.handlers['Network.getResponseBody'] = (target, { requestId }) => ({
+        body: requestId === 'large' ? 'x'.repeat(1025) : 'small',
+        base64Encoded: false,
+    });
     replayRequest(fake, 1, {
-        requestId: 'large', url: 'https://a.test/big', method: 'POST', request: { hasPostData: true, postData: 'y'.repeat(2000) },
+        requestId: 'large',
+        url: 'https://a.test/big',
+        method: 'POST',
+        request: { hasPostData: true, postData: 'y'.repeat(2000) },
     });
     replayRequest(fake, 1, { requestId: 'fits', url: 'https://a.test/small' });
     await settle();
@@ -206,7 +238,10 @@ test('bodies over the size limit are replaced by a marker', async () => {
 test('credentials are redacted only when the setting is on', async () => {
     const fake = await startedOn(1);
     const request = { headers: { Authorization: 'Bearer secret', Accept: 'application/json' } };
-    const response = { headers: { 'set-cookie': 'sid=abc', 'content-type': 'application/json' }, headersText: 'set-cookie: sid=abc' };
+    const response = {
+        headers: { 'set-cookie': 'sid=abc', 'content-type': 'application/json' },
+        headersText: 'set-cookie: sid=abc',
+    };
     replayRequest(fake, 1, { requestId: 'plain', url: 'https://a.test/1', request, response });
     await settle();
     await fake.chrome.storage.local.set({ redact: true });
@@ -260,7 +295,9 @@ test('stats reach session storage and the badge, and reset on the next start', a
     assert.equal(fake.badge.text, '');
     // Kept after stopping so the popup can show the totals.
     assert.deepEqual(fake.chrome.storage.session.data.capture, {
-        tabId: null, stats: { forwarded: 2, failed: 0, skipped: 0 }, lastSendError: null,
+        tabId: null,
+        stats: { forwarded: 2, failed: 0, skipped: 0 },
+        lastSendError: null,
     });
 
     await fake.message({ type: 'start', tabId: 2 });
@@ -277,7 +314,10 @@ test('the tab is reloaded after Network.enable when reloadOnStart is on', async 
     const [reload] = on.reloads;
     assert.equal(reload.tabId, 1);
     assert.equal(reload.attached, true);
-    assert.deepEqual(on.commands.slice(0, reload.commands).map((c) => c.method), ['Network.enable']);
+    assert.deepEqual(
+        on.commands.slice(0, reload.commands).map((c) => c.method),
+        ['Network.enable'],
+    );
 });
 
 test('attach failures are returned to the popup', async () => {
@@ -321,7 +361,10 @@ test('quick successive starts end with only the last tab attached', async () => 
     await loadBackground(fake);
     const responses = await Promise.all([1, 2, 3].map((tabId) => fake.message({ type: 'start', tabId })));
 
-    assert.ok(responses.every((r) => r.ok), JSON.stringify(responses));
+    assert.ok(
+        responses.every((r) => r.ok),
+        JSON.stringify(responses),
+    );
     assert.deepEqual([...fake.attached], [3]);
     assert.equal((await status(fake)).tabId, 3);
 });

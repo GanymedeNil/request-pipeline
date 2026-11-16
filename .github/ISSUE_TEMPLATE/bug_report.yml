@@ -1,0 +1,59 @@
+name: Bug report
+description: Something doesn't capture, forward or display as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please remove cookies, tokens and other private data from anything you paste.
+  - type: input
+    id: extension-version
+    attributes:
+      label: Extension version
+      description: Shown on chrome://extensions under Request Pipeline.
+      placeholder: '1.2.0'
+    validations:
+      required: true
+  - type: input
+    id: chrome-version
+    attributes:
+      label: Chrome version and OS
+      description: From chrome://version.
+      placeholder: 'Chrome 142 on macOS 15'
+    validations:
+      required: true
+  - type: dropdown
+    id: receiver
+    attributes:
+      label: Receiver
+      options:
+        - examples/receiver.py
+        - My own server
+        - Not relevant
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Which page, which options were on, what you clicked.
+      placeholder: |
+        1. Start `python3 examples/receiver.py`
+        2. Open https://example.com and start capture with "Reload the page" on
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected-actual
+    attributes:
+      label: What you expected and what happened
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Service worker console
+      description: >
+        On chrome://extensions, turn on Developer mode, click "service worker" under Request Pipeline,
+        and paste any lines starting with [request-pipeline].
+      render: text

@@ -1,18 +1,39 @@
-import { CAPTURE_STATE_KEY, DEFAULT_SETTINGS, TOGGLEABLE_TYPES } from './config.js';
+import { CAPTURE_STATE_KEY, DEFAULT_SETTINGS, TOGGLEABLE_TYPES, emptyCaptureState } from './config.js';
 
-const $ = (id) => document.getElementById(id);
-const tabSelect = $('tab');
-const toggleButton = $('toggle');
-const statusEl = $('status');
-const errorEl = $('error');
-const liveEl = $('live');
-const serverWarningEl = $('server-warning');
-const typesEl = $('types');
+/**
+ * @typedef {import('./config.js').Settings} Settings
+ * @typedef {import('./config.js').CaptureState} CaptureState
+ * @typedef {import('./config.js').Message} Message
+ * @typedef {import('./config.js').StatusResponse} StatusResponse
+ * @typedef {HTMLInputElement | HTMLTextAreaElement} SettingField
+ */
+
+/**
+ * @template {HTMLElement} T
+ * @param {string} id
+ * @param {new () => T} type
+ * @returns {T}
+ */
+function $(id, type) {
+    const el = document.getElementById(id);
+    if (!(el instanceof type)) {
+        throw new Error(`#${id} is missing or not a ${type.name}`);
+    }
+    return el;
+}
+
+const tabSelect = $('tab', HTMLSelectElement);
+const toggleButton = $('toggle', HTMLButtonElement);
+const statusEl = $('status', HTMLElement);
+const errorEl = $('error', HTMLElement);
+const liveEl = $('live', HTMLElement);
+const serverWarningEl = $('server-warning', HTMLElement);
+const typesEl = $('types', HTMLElement);
+const optionsEl = $('options', HTMLDetailsElement);
 
 // chrome:// pages, the Web Store and other extensions can't be attached to.
 const ATTACHABLE_URL = /^(https?|file):/;
 const INVALID = Symbol('invalid');
-const EMPTY_CAPTURE = { tabId: null, stats: { forwarded: 0, failed: 0, skipped: 0 }, lastSendError: null };
 
 const [tabs, [activeTab], storedCapture, settings] = await Promise.all([
     chrome.tabs.query({}),
@@ -20,7 +41,8 @@ const [tabs, [activeTab], storedCapture, settings] = await Promise.all([
     chrome.storage.session.get(CAPTURE_STATE_KEY),
     loadSettings(),
 ]);
-let capture = storedCapture[CAPTURE_STATE_KEY] ?? EMPTY_CAPTURE;
+/** @type {CaptureState} */
+let capture = /** @type {CaptureState | undefined} */ (storedCapture[CAPTURE_STATE_KEY]) ?? emptyCaptureState();
 let actionError = '';
 
 for (const tab of tabs) {
@@ -36,7 +58,6 @@ if (tabSelect.options.length === 0) {
 }
 
 // Remember whether Options was left open.
-const optionsEl = $('options');
 optionsEl.open = localStorage.getItem('optionsOpen') === '1';
 optionsEl.addEventListener('toggle', () => localStorage.setItem('optionsOpen', optionsEl.open ? '1' : '0'));
 
@@ -48,7 +69,7 @@ render();
 // The service worker keeps the capture state in session storage; follow it live.
 chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'session' && CAPTURE_STATE_KEY in changes) {
-        capture = changes[CAPTURE_STATE_KEY].newValue ?? EMPTY_CAPTURE;
+        capture = /** @type {CaptureState | undefined} */ (changes[CAPTURE_STATE_KEY].newValue) ?? emptyCaptureState();
         render();
     }
 });
@@ -56,9 +77,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
 toggleButton.addEventListener('click', async () => {
     toggleButton.disabled = true;
     await flushSaves();
-    const response = await chrome.runtime.sendMessage(
-        capture.tabId === null ? { type: 'start', tabId: Number(tabSelect.value) } : { type: 'stop' },
-    );
+    /** @type {Message} */
+    const message = capture.tabId === null ? { type: 'start', tabId: Number(tabSelect.value) } : { type: 'stop' };
+    /** @type {StatusResponse} */
+    const response = await chrome.runtime.sendMessage(message);
     actionError = response.ok ? '' : `Could not capture this tab: ${response.error}`;
     capture = { tabId: response.tabId, stats: response.stats, lastSendError: response.lastSendError };
     render();
@@ -97,6 +119,7 @@ function render() {
     errorEl.hidden = errors.length === 0;
 }
 
+/** @returns {Promise<Settings>} */
 async function loadSettings() {
     // Versions up to 1.0.2 kept the server address in the popup's localStorage, which the service
     // worker can't read. Move it over once.
@@ -106,42 +129,54 @@ async function loadSettings() {
         await chrome.storage.local.set({ server: legacy });
         localStorage.removeItem('server');
     }
-    return chrome.storage.local.get(DEFAULT_SETTINGS);
+    return /** @type {Settings} */ (await chrome.storage.local.get({ ...DEFAULT_SETTINGS }));
 }
 
 // Text fields save 300 ms after typing stops (and on blur); checkboxes save on change. The service
 // worker picks changes up from storage, so they apply to a capture that's already running.
+/** @type {Map<SettingField, ReturnType<typeof setTimeout>>} */
 const saveTimers = new Map();
 
+/** @param {SettingField} el */
+function settingKey(el) {
+    return /** @type {keyof Settings} */ (el.dataset.setting);
+}
+
 function bindSettings() {
-    for (const el of document.querySelectorAll('[data-setting]')) {
-        const key = el.dataset.setting;
-        if (el.type === 'checkbox') {
-            el.checked = settings[key];
+    /** @type {NodeListOf<SettingField>} */
+    const fields = document.querySelectorAll('input[data-setting], textarea[data-setting]');
+    for (const el of fields) {
+        const value = settings[settingKey(el)];
+        if (el instanceof HTMLInputElement && el.type === 'checkbox') {
+            el.checked = Boolean(value);
             el.addEventListener('change', () => saveField(el));
         } else {
-            el.value = settings[key];
+            el.value = String(value);
             el.addEventListener('input', () => {
                 clearTimeout(saveTimers.get(el));
-                saveTimers.set(el, setTimeout(() => saveField(el), 300));
+                saveTimers.set(
+                    el,
+                    setTimeout(() => saveField(el), 300),
+                );
             });
             el.addEventListener('change', () => saveField(el));
         }
     }
 }
 
+/** @param {SettingField} el */
 async function saveField(el) {
     clearTimeout(saveTimers.get(el));
     saveTimers.delete(el);
-    const key = el.dataset.setting;
-    const value = el.type === 'checkbox' ? el.checked : parseSetting(key, el.value);
+    const key = settingKey(el);
+    const value = el instanceof HTMLInputElement && el.type === 'checkbox' ? el.checked : parseSetting(key, el.value);
     const valid = value !== INVALID;
     el.classList.toggle('invalid', !valid);
     el.setAttribute('aria-invalid', String(!valid));
     if (!valid || value === settings[key]) {
         return;
     }
-    settings[key] = value;
+    /** @type {Record<string, unknown>} */ (settings)[key] = value;
     await chrome.storage.local.set({ [key]: value });
     if (key === 'server' || key === 'redact') {
         renderServerWarning();
@@ -153,6 +188,11 @@ function flushSaves() {
     return Promise.all([...saveTimers.keys()].map(saveField));
 }
 
+/**
+ * @param {keyof Settings} key
+ * @param {string} raw
+ * @returns {string | number | typeof INVALID}
+ */
 function parseSetting(key, raw) {
     switch (key) {
         case 'server': {
@@ -182,9 +222,13 @@ function renderTypes() {
 }
 
 async function saveTypes() {
-    const unchecked = [...typesEl.querySelectorAll('input:not(:checked)')].map((box) => box.value);
+    /** @type {NodeListOf<HTMLInputElement>} */
+    const unchecked = typesEl.querySelectorAll('input:not(:checked)');
     // Types without a checkbox keep whatever they were set to.
-    settings.ignoredTypes = [...settings.ignoredTypes.filter((t) => !TOGGLEABLE_TYPES.includes(t)), ...unchecked];
+    settings.ignoredTypes = [
+        ...settings.ignoredTypes.filter((t) => !TOGGLEABLE_TYPES.includes(t)),
+        ...[...unchecked].map((box) => box.value),
+    ];
     await chrome.storage.local.set({ ignoredTypes: settings.ignoredTypes });
 }
 
@@ -197,9 +241,11 @@ function renderServerWarning() {
         // empty or invalid: nothing is sent
     }
     if (url && !isLocalHost(url.hostname)) {
-        notes.push(settings.redact
-            ? `Records are sent to ${url.host}.`
-            : `Records are sent to ${url.host}, including cookies and auth headers. Turn on "Redact credentials" under Options to strip them.`);
+        notes.push(
+            settings.redact
+                ? `Records are sent to ${url.host}.`
+                : `Records are sent to ${url.host}, including cookies and auth headers. Turn on "Redact credentials" under Options to strip them.`,
+        );
         if (url.protocol === 'http:') {
             notes.push('The connection is not encrypted.');
         }
@@ -208,10 +254,14 @@ function renderServerWarning() {
     serverWarningEl.hidden = notes.length === 0;
 }
 
+/** @param {string} hostname */
 function isLocalHost(hostname) {
-    return hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '[::1]' || /^127\./.test(hostname);
+    return (
+        hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '[::1]' || /^127\./.test(hostname)
+    );
 }
 
+/** @param {string} value */
 function isHttpUrl(value) {
     try {
         return ['http:', 'https:'].includes(new URL(value).protocol);

@@ -19,9 +19,12 @@ function createStorageArea(area, initial, onChanged) {
             if (typeof keys === 'string') {
                 return keys in data ? { [keys]: structuredClone(data[keys]) } : {};
             }
-            return Object.fromEntries(Object.entries(keys).map(
-                ([key, fallback]) => [key, structuredClone(key in data ? data[key] : fallback)],
-            ));
+            return Object.fromEntries(
+                Object.entries(keys).map(([key, fallback]) => [
+                    key,
+                    structuredClone(key in data ? data[key] : fallback),
+                ]),
+            );
         },
         async set(items) {
             const changes = {};
@@ -136,10 +139,22 @@ export function createFakeChrome({ local = {}, session = {} } = {}) {
 export const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 // Replays the events Chrome emits for one request. `startTime` is in seconds, like CDP timestamps.
-export function replayRequest(fake, tabId, {
-    requestId, url, type = 'XHR', method = 'GET', request = {}, response = {}, finish = 'loadingFinished',
-    startTime = 100, duration = 0.25, documentURL = 'https://page.test/',
-}) {
+export function replayRequest(
+    fake,
+    tabId,
+    {
+        requestId,
+        url,
+        type = 'XHR',
+        method = 'GET',
+        request = {},
+        response = {},
+        finish = 'loadingFinished',
+        startTime = 100,
+        duration = 0.25,
+        documentURL = 'https://page.test/',
+    },
+) {
     fake.event(tabId, 'Network.requestWillBeSent', {
         requestId,
         type,
@@ -157,6 +172,10 @@ export function replayRequest(fake, tabId, {
     if (finish === 'loadingFinished') {
         fake.event(tabId, 'Network.loadingFinished', { requestId, timestamp: startTime + duration });
     } else if (finish === 'loadingFailed') {
-        fake.event(tabId, 'Network.loadingFailed', { requestId, timestamp: startTime + duration, errorText: 'net::ERR_FAILED' });
+        fake.event(tabId, 'Network.loadingFailed', {
+            requestId,
+            timestamp: startTime + duration,
+            errorText: 'net::ERR_FAILED',
+        });
     }
 }

@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest something the extension or the receiver should do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The task or workflow, not the solution. For example "replay captured API calls in my test suite".
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would help?
+    validations:
+      required: false
+  - type: textarea
+    id: workaround
+    attributes:
+      label: How do you handle it today?
+    validations:
+      required: false

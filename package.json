@@ -2,7 +2,27 @@
   "name": "request-pipeline",
   "private": true,
   "type": "module",
+  "description": "Development tooling for the Request Pipeline Chrome extension. The extension itself has no runtime dependencies.",
+  "engines": {
+    "node": ">=22.2"
+  },
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "test:e2e": "node --test --test-concurrency=1 e2e/*.test.js",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "typecheck": "tsc -p tsconfig.json",
+    "check": "npm run lint && npm run typecheck && npm test",
+    "package": "node scripts/package.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/chrome": "^0.3.7",
+    "devtools-protocol": "^0.0.1744848",
+    "eslint": "^10.15.0",
+    "globals": "^17.14.0",
+    "playwright": "^1.65.1",
+    "prettier": "^3.10.1",
+    "typescript": "^7.0.2"
   }
 }

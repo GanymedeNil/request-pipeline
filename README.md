@@ -125,11 +125,30 @@ The request sent by the extension is **POST**, and the data format is **JSON**, 
 
 ## Development
 
+The extension is plain JavaScript with no build step: load the repository folder with **Load unpacked** and reload it after changes. Node.js 22.2 or later is only needed for the tooling.
+
 ```bash
-npm test
+npm install
+npm run check      # lint (ESLint + Prettier), type check, unit tests
+npm run format     # apply Prettier
+npm run package    # dist/request-pipeline-<version>.zip, the file uploaded to the Chrome Web Store
+npm run test:e2e   # browser tests: loads the extension in Chromium and drives the popup
 ```
 
-The tests replay Chrome DevTools Protocol event sequences against `background.js` with a fake `chrome` API, and unit-test the filter and redaction logic in `lib/`. They need Node.js 22 or later and no dependencies.
+- **Layout**: `background.js` (service worker) wires Chrome events to the logic in `lib/`, which has no `chrome.*` calls: `filter.js`, `record.js`, `redact.js`, `forward.js`. `config.js` holds the settings, their defaults and the shared types.
+- **Types** are JSDoc comments checked by TypeScript in strict mode (`npm run typecheck`); nothing is compiled.
+- **Unit tests** (`test/`) replay Chrome DevTools Protocol event sequences against `background.js` with a fake `chrome` API.
+- **Browser tests** (`e2e/`) need Python 3 for `examples/receiver.py` and a Chromium build: run `npx playwright install chromium` once, or set `CHROME_PATH` to a Chrome for Testing or Chromium binary (branded Chrome no longer loads unpacked extensions from the command line). `EXTENSION_DIR` loads another directory, such as the unzipped package, and `SCREENSHOT_DIR` saves popup screenshots in light and dark mode.
+- **Packaging** follows what the manifest actually loads, so only those files go into the zip; a reference to a missing file fails the build.
+
+CI runs all of the above on every pull request, with the browser tests on the unzipped package.
+
+### Releasing
+
+1. Set `version` in `manifest.json`, and in `CHANGELOG.md` change the section heading from `Unreleased` to today's date.
+2. Merge, then tag `main` and push the tag: `git tag v1.2.0 && git push origin v1.2.0`.
+3. The release workflow checks that the tag, `manifest.json` and `CHANGELOG.md` agree, runs the checks, and publishes a GitHub release with the zip attached and the changelog section as notes.
+4. Upload that zip in the [Chrome Web Store developer dashboard](https://chrome.google.com/webstore/devconsole).
 
 ## reference
 
