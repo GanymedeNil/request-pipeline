@@ -57,6 +57,23 @@ h1 {
     font-weight: 600;
 }
 
+.header-end {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.feedback {
+    color: var(--muted);
+    font-size: 12px;
+    text-decoration: none;
+}
+
+.feedback:hover {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
 .live {
     padding: 1px 6px;
     border-radius: 999px;

@@ -52,7 +52,9 @@ At this point, all the necessary data are obtained.
 
 ### One more thing
 
-Only http(s) requests are forwarded. By default, static assets (stylesheets, scripts, images, fonts, media, manifests and CORS preflights) are filtered out by their [resource type](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-ResourceType); you can change this under **Options**. In fact, you can also capture WebSocket content according to the Debugger documentation, and you are welcome to contribute to the functionality!
+Only http(s) requests are forwarded. By default, static assets (stylesheets, scripts, images, fonts, media, manifests and CORS preflights) are filtered out by their [resource type](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-ResourceType); you can change this under **Options**.
+
+Cross-site iframes and workers run as separate debugging targets, so the tab's own session doesn't see their traffic. The extension uses `Target.setAutoAttach` to attach to each one as it starts (pausing it until its network tracking is on), so their requests are captured too. WebSocket messages (`Network.webSocketFrameSent` / `Received`) and EventSource messages (`Network.eventSourceMessageReceived`) can be forwarded as well; see **Options** below.
 
 ## Install
 
@@ -73,7 +75,7 @@ It listens on `http://127.0.0.1:6789`, the extension's default address, and prin
 200 GET     https://api.example.com/orders  (application/json, 1.2 KB, 85 ms)
 ```
 
-To keep what you capture, add `--jsonl requests.jsonl` (one record per line) and/or `--har capture.har` (a HAR file you can open in Chrome DevTools or other HTTP tools). Use `--port` to listen elsewhere.
+To keep what you capture, add `--jsonl requests.jsonl` (one record per line) and/or `--har capture.har` (a HAR file you can open in Chrome DevTools or other HTTP tools; WebSocket messages are stored on their connection's entry the way DevTools exports them). Use `--port` to listen elsewhere.
 
 ## Use
 
@@ -85,7 +87,7 @@ To keep what you capture, add `--jsonl requests.jsonl` (one record per line) and
 
 <img src="./asset/image/popup.png" width="340" align="right" alt="The popup while capturing, with Options expanded">
 
-While capturing, the popup shows how many requests were forwarded, failed to send, or skipped (no response body available), and the toolbar badge shows the forwarded count. The badge turns red if forwarding fails; the popup then shows the error.
+While capturing, the popup shows how many records were forwarded, failed to send, or skipped (no response body available), and the toolbar badge shows the forwarded count. The badge turns red if forwarding fails; the popup then shows the error.
 
 **Server address** is where records are POSTed. It's saved as you type and applies right away, including to a running capture. Leave it empty to stop forwarding. If it points anywhere other than this computer, the popup warns you, since records include cookies and auth headers unless you turn on redaction.
 
@@ -96,19 +98,24 @@ While capturing, the popup shows how many requests were forwarded, failed to sen
 - **Forward these resource types**: which kinds of requests are sent.
 - **Only URLs matching / Skip URLs matching**: one pattern per line. `*` matches anything, so `https://api.example.com/*` matches the whole URL; a pattern without `*` matches any URL containing it. Skip wins over Only.
 - **Methods**: e.g. `GET, POST`. Empty means all.
-- **Max body**: request and response bodies longer than this many KB are replaced by a marker (see below). 0 means no limit.
+- **Max body**: request and response bodies, and WebSocket and SSE message data, longer than this many KB are replaced by a marker (see below). 0 means no limit.
+- **Forward WebSocket messages** / **Forward EventSource (SSE) messages**: off by default. Each socket open, message, error and close, and each SSE message, is sent as its own record (see below). URL patterns, the size limit and redaction apply. Only sockets and streams opened after capture starts are seen, so combine this with **Reload the page** to catch those a page opens while loading.
 
 <br clear="right">
 
 ### Data format
 
-The request sent by the extension is **POST**, and the data format is **JSON**, one request per POST:
+The extension POSTs one **JSON** record per request (or per WebSocket/SSE event). `kind` says which shape it has; receivers written for older versions can treat a record without `kind` as `"http"`.
+
+#### HTTP records (`"kind": "http"`)
 
 | FIELD             | TYPE | NOTE |
 | ----------------- | ---- | ---- |
 | **schema_version** | **number** | `1`. Records from versions before 1.2 don't have this field. |
-| **request_id**    | **string** | The Chrome DevTools request ID, unique within a tab. |
+| **kind**          | **string** | `"http"`. Added in 1.3. |
+| **request_id**    | **string** | The Chrome DevTools request ID, unique within the target that made it. |
 | **tab_id**        | **number** | The captured tab. |
+| **target_type**   | **string** | What made the request: `page` (the tab), `iframe` (a cross-site iframe), `worker`, `shared_worker`, `service_worker`. Added in 1.3. |
 | **document_url**  | **string** | URL of the document that made the request. |
 | **resource_type** | **string** | [ResourceType](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-ResourceType), e.g. `XHR`, `Fetch`, `Document`. |
 | **timestamp**     | **number** | When the request was sent, in milliseconds since the Unix epoch. |
@@ -122,6 +129,24 @@ The request sent by the extension is **POST**, and the data format is **JSON**, 
 - `cookies` is left out if Chrome couldn't return them.
 - Requests whose response body Chrome no longer has (redirects, evicted buffers) are not forwarded; they count as *skipped*.
 - When a body is over the **Max body** limit, `response_body` becomes `{ "body": null, "base64Encoded": …, "omitted": "too_large", "length": <characters> }`, and the request gets `"postData": null, "postDataOmitted": "too_large", "postDataLength": <characters>`.
+- A response streamed with `fetch()` (rather than EventSource) arrives as one HTTP record once it finishes.
+
+#### WebSocket records (`"kind": "websocket"`, when turned on)
+
+Every record has `schema_version`, `kind`, `request_id` (one per socket), `tab_id`, `target_type`, `url` and `timestamp` (milliseconds since the epoch), plus `event`:
+
+| `event` | Extra fields |
+| ------- | ------------ |
+| `open` | `request: { headers }` and `response: { status, statusText, headers }` from the handshake. |
+| `message` | `direction` (`"sent"` / `"received"`), `opcode` (1 text, 2 binary), `data` (text, or base64 for binary), `base64Encoded`. Over the size limit: `data: null`, `omitted: "too_large"`, `length`. |
+| `error` | `error_message`. |
+| `close` | None. |
+
+Records of one socket are sent in order. With redaction on, the handshake's credential headers are redacted; message data is not.
+
+#### EventSource records (`"kind": "sse"`, when turned on)
+
+`schema_version`, `kind`, `event: "message"`, `request_id` (one per stream), `tab_id`, `target_type`, `url`, `document_url`, `timestamp`, `event_name`, `event_id` and `data` (with the same size-limit marker). The EventSource request itself doesn't produce an HTTP record.
 
 ## Development
 

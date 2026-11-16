@@ -9,7 +9,16 @@
     <body>
         <header>
             <h1>Request Pipeline</h1>
-            <span id="live" class="live" hidden>REC</span>
+            <div class="header-end">
+                <span id="live" class="live" hidden>REC</span>
+                <a
+                    class="feedback"
+                    href="https://github.com/GanymedeNil/request-pipeline/issues/new/choose"
+                    target="_blank"
+                    rel="noopener"
+                    >Feedback</a
+                >
+            </div>
         </header>
 
         <section>
@@ -47,6 +56,14 @@
             <label class="check">
                 <input type="checkbox" data-setting="redact" />
                 <span>Redact credentials <small>(auth and cookie headers, cookie values)</small></span>
+            </label>
+            <label class="check">
+                <input type="checkbox" data-setting="captureWebSocket" />
+                <span>Forward WebSocket messages</span>
+            </label>
+            <label class="check">
+                <input type="checkbox" data-setting="captureEventSource" />
+                <span>Forward EventSource (SSE) messages</span>
             </label>
 
             <fieldset>

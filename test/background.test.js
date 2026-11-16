@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, test } from 'node:test';
-import { createFakeChrome, replayRequest, settle } from './fake-chrome.js';
+import { createFakeChrome, loadBackground, replayRequest, settle } from './fake-chrome.js';
 
-let instance = 0;
 let sent;
 let fetchImpl;
 
@@ -14,14 +13,6 @@ beforeEach(() => {
         return fetchImpl(url, init);
     };
 });
-
-// Each call evaluates background.js afresh, like a service worker (re)start.
-async function loadBackground(fake) {
-    globalThis.chrome = fake.chrome;
-    const module = await import(`../background.js?instance=${++instance}`);
-    await settle();
-    return module;
-}
 
 async function startedOn(tabId, options) {
     const fake = createFakeChrome(options);
@@ -46,8 +37,10 @@ test('forwards one record per finished request, with metadata', async () => {
     const body = sent[0].body;
     assert.deepEqual(Object.keys(body), [
         'schema_version',
+        'kind',
         'request_id',
         'tab_id',
+        'target_type',
         'document_url',
         'resource_type',
         'timestamp',
@@ -58,6 +51,8 @@ test('forwards one record per finished request, with metadata', async () => {
         'response_body',
     ]);
     assert.equal(body.schema_version, 1);
+    assert.equal(body.kind, 'http');
+    assert.equal(body.target_type, 'page');
     assert.equal(body.request_id, 'r1');
     assert.equal(body.tab_id, 1);
     assert.equal(body.document_url, 'https://page.test/');
@@ -316,7 +311,7 @@ test('the tab is reloaded after Network.enable when reloadOnStart is on', async 
     assert.equal(reload.attached, true);
     assert.deepEqual(
         on.commands.slice(0, reload.commands).map((c) => c.method),
-        ['Network.enable'],
+        ['Network.enable', 'Target.setAutoAttach'],
     );
 });
 
