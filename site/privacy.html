@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Privacy policy · Request Pipeline</title>
+        <meta
+            name="description"
+            content="What the Request Pipeline Chrome extension reads, where it sends it, and what it stores."
+        />
+        <meta name="theme-color" content="#eef6f9" />
+        <link rel="icon" type="image/png" href="images/icon-32.png" />
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <a class="skip" href="#main">Skip to content</a>
+        <header class="wrap nav">
+            <a class="brand" href="./"><img src="images/icon-128.png" alt="" />Request Pipeline</a>
+            <nav class="nav-links" aria-label="Main">
+                <a href="terms.html">Terms</a>
+                <a href="https://github.com/GanymedeNil/request-pipeline">GitHub</a>
+            </nav>
+        </header>
+
+        <main id="main" class="wrap">
+            <article class="doc">
+                <h1>Privacy policy</h1>
+                <p class="effective">Effective November 16, 2026</p>
+
+                <p class="summary">
+                    The Request Pipeline extension sends the network traffic you capture only to the server address you
+                    set, which is your own computer unless you change it. Nothing goes to the developer, and nothing is
+                    used for advertising or analytics, or sold.
+                </p>
+
+                <p>
+                    This policy covers the Request Pipeline Chrome extension and this website. Request Pipeline is
+                    open-source software; you can check every statement below against
+                    <a href="https://github.com/GanymedeNil/request-pipeline">its source code</a>.
+                </p>
+
+                <h2>What the extension reads</h2>
+                <ul>
+                    <li>
+                        <b>The network traffic of the tab you choose</b>, only while a capture you started is running:
+                        request URLs, methods, headers and bodies; response status, headers and bodies; the cookies
+                        Chrome holds for each request's URL; timing; the tab's ID; and the address of the page that made
+                        each request. In versions that offer it, and only if you turn it on, it also reads WebSocket and
+                        EventSource messages.
+                    </li>
+                    <li>
+                        <b>The titles and addresses of your open tabs</b>, to list them in the popup so you can choose
+                        one. They stay in the popup and are not sent anywhere.
+                    </li>
+                </ul>
+                <p>
+                    Depending on the pages you capture, this traffic can contain personal information, such as names,
+                    email addresses or messages shown on those pages, and credentials such as session cookies and
+                    authorization headers.
+                </p>
+
+                <h2>Where it goes</h2>
+                <ul>
+                    <li>
+                        Each captured request is sent as an HTTP POST to the <b>server address set in the popup</b>, and
+                        nowhere else. The default is <code>http://127.0.0.1:6789</code>, which is your own computer. If
+                        you enter another address, records go to that server, and whoever runs it is responsible for
+                        them.
+                    </li>
+                    <li>
+                        Nothing is sent to the developer of Request Pipeline or to any other third party. The extension
+                        has no analytics, telemetry, crash reporting or advertising, and it doesn't load remote code.
+                    </li>
+                    <li>
+                        <b>Redact credentials</b> in the popup's Options replaces the values of
+                        <code>Authorization</code>, <code>Cookie</code>, <code>Set-Cookie</code> and similar headers,
+                        and of all cookies, with <code>[REDACTED]</code> before anything is sent. URLs and bodies are
+                        sent as they are.
+                    </li>
+                    <li>
+                        For a server that isn't on your computer, use an <code>https://</code> address. The popup warns
+                        you when the address isn't local or isn't encrypted.
+                    </li>
+                </ul>
+
+                <h2>What it stores on your computer</h2>
+                <ul>
+                    <li>Your settings (server address, filters and options), in Chrome's storage for extensions.</li>
+                    <li>
+                        The state of the current capture (which tab, the forwarded, failed and skipped counts, and the
+                        last forwarding error), in Chrome's session storage, which is cleared when Chrome closes.
+                    </li>
+                    <li>Whether you left the Options section open, in the popup's local storage.</li>
+                </ul>
+                <p>
+                    Captured requests are kept in memory only until they are sent; the extension doesn't save them.
+                    Removing the extension deletes everything it stored.
+                </p>
+
+                <h2>Permissions</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th scope="col">Permission</th>
+                            <th scope="col">Why the extension needs it</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>debugger</td>
+                            <td>
+                                To read the network traffic of the tab you choose, only after you press Start capture.
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>tabs</td>
+                            <td>To list your open tabs in the popup so you can choose one.</td>
+                        </tr>
+                        <tr>
+                            <td>storage</td>
+                            <td>To remember your settings and the state of a running capture.</td>
+                        </tr>
+                        <tr>
+                            <td>Access to websites</td>
+                            <td>To send records to the server address you configure, whatever its address.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h2>Chrome Web Store user data policy</h2>
+                <p>
+                    The use of information the extension handles adheres to the
+                    <a href="https://developer.chrome.com/docs/webstore/program-policies/policies"
+                        >Chrome Web Store User Data Policy</a
+                    >, including its Limited Use requirements. The data is used only to forward it to the server you
+                    configure, which is the extension's single purpose. It isn't sold, isn't used to determine
+                    creditworthiness or for lending, and isn't transferred to anyone else.
+                </p>
+
+                <h2>This website</h2>
+                <p>
+                    This site sets no cookies, has no analytics and loads nothing from other sites; even its fonts are
+                    served from here. It is hosted on GitHub Pages, and GitHub may log visitors' IP addresses for
+                    security purposes, as described in the
+                    <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement"
+                        >GitHub General Privacy Statement</a
+                    >. Links to GitHub and the Chrome Web Store take you to services with their own privacy policies;
+                    the extension's Feedback link opens GitHub.
+                </p>
+
+                <h2>Children</h2>
+                <p>Request Pipeline is a developer tool and isn't directed at children under 13.</p>
+
+                <h2>Changes</h2>
+                <p>
+                    Changes to this policy are published on this page with a new effective date. Earlier versions are in
+                    the
+                    <a href="https://github.com/GanymedeNil/request-pipeline/commits/main/site/privacy.html"
+                        >repository's history</a
+                    >.
+                </p>
+
+                <h2>Contact</h2>
+                <p>
+                    Questions about this policy:
+                    <a href="https://github.com/GanymedeNil/request-pipeline/issues">open an issue on GitHub</a>.
+                </p>
+            </article>
+        </main>
+
+        <footer class="footer">
+            <div class="wrap">
+                <span>Request Pipeline</span>
+                <nav aria-label="Footer">
+                    <a href="./">Home</a>
+                    <a href="terms.html">Terms</a>
+                    <a href="https://github.com/GanymedeNil/request-pipeline">Source</a>
+                    <a href="https://github.com/GanymedeNil/request-pipeline/issues">Report an issue</a>
+                </nav>
+                <p class="legal">
+                    Free software under GPL-3.0. Chrome is a trademark of Google LLC; this project is not affiliated
+                    with Google.
+                </p>
+            </div>
+        </footer>
+    </body>
+</html>

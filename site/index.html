@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Request Pipeline: pipe a tab's network traffic into your own code</title>
+        <meta
+            name="description"
+            content="A Chrome extension that forwards each request a tab makes, with headers, bodies, cookies and timing, to a server you run, as JSON."
+        />
+        <meta name="theme-color" content="#eef6f9" />
+        <link rel="icon" type="image/png" href="images/icon-32.png" />
+        <link rel="stylesheet" href="styles.css" />
+        <script src="hero.js" defer></script>
+    </head>
+    <body>
+        <a class="skip" href="#main">Skip to content</a>
+        <header class="wrap nav">
+            <a class="brand" href="./"><img src="images/icon-128.png" alt="" />Request Pipeline</a>
+            <nav class="nav-links" aria-label="Main">
+                <a class="hide-sm" href="#how">How it works</a>
+                <a class="hide-sm" href="privacy.html">Privacy</a>
+                <a class="hide-sm" href="https://github.com/GanymedeNil/request-pipeline">GitHub</a>
+                <a
+                    class="button primary"
+                    href="https://chromewebstore.google.com/detail/request-pipeline/kkaplobblnfnadlodpgdehhieofppead"
+                    >Add to Chrome</a
+                >
+            </nav>
+        </header>
+
+        <main id="main">
+            <section class="wrap hero">
+                <div>
+                    <p class="eyebrow">Chrome extension · open source</p>
+                    <h1><span class="pipe-word">Pipe</span> a tab's network traffic into your own code.</h1>
+                    <p class="lede">
+                        Request Pipeline forwards each request a tab makes, with headers, bodies, cookies and timing, to
+                        a server you run, as JSON, while you browse. No proxy, and no DevTools left open.
+                    </p>
+                    <div class="actions">
+                        <a
+                            class="button primary"
+                            href="https://chromewebstore.google.com/detail/request-pipeline/kkaplobblnfnadlodpgdehhieofppead"
+                            >Add to Chrome</a
+                        >
+                        <a class="button" href="https://github.com/GanymedeNil/request-pipeline">View the source</a>
+                    </div>
+                    <p class="fineprint">
+                        Free under GPL-3.0. Works in the tab you already have open, signed in as you.
+                    </p>
+                </div>
+
+                <div
+                    class="demo"
+                    role="img"
+                    aria-label="Requests made by a shop page flow down a pipe into a receiver, which prints one line per request."
+                >
+                    <div class="tab-card" aria-hidden="true">
+                        <div class="card-bar">
+                            <i></i><i></i><i></i><span class="addr">shop.example/orders</span
+                            ><span class="rec">REC</span>
+                        </div>
+                        <ol class="waterfall" id="waterfall">
+                            <li class="sent">
+                                <span class="method">GET</span><span class="path">/orders</span
+                                ><span class="status">200</span><span class="bar"><span style="--w: 30%"></span></span>
+                            </li>
+                            <li class="sent">
+                                <span class="method">GET</span><span class="path">/api/orders?page=1</span
+                                ><span class="status">200</span><span class="bar"><span style="--w: 72%"></span></span>
+                            </li>
+                            <li class="sent">
+                                <span class="method">GET</span><span class="path">/api/stats</span
+                                ><span class="status">200</span><span class="bar"><span style="--w: 34%"></span></span>
+                            </li>
+                            <li class="sent">
+                                <span class="method">GET</span><span class="path">/api/me</span
+                                ><span class="status">200</span><span class="bar"><span style="--w: 44%"></span></span>
+                            </li>
+                            <li class="sent">
+                                <span class="method">POST</span><span class="path">/api/orders/1042/notes</span
+                                ><span class="status">201</span><span class="bar"><span style="--w: 96%"></span></span>
+                            </li>
+                        </ol>
+                    </div>
+                    <div class="pipe" id="pipe" aria-hidden="true"></div>
+                    <div class="term-card" aria-hidden="true">
+                        <div class="card-bar"><i></i><i></i><i></i><span class="addr">receiver.py</span></div>
+                        <pre class="term-lines" id="term"><span class="prompt">$</span> python3 examples/receiver.py
+<span class="dim">Listening on http://127.0.0.1:6789</span>
+<span class="ok">200</span> GET  /orders <span class="dim">(text/html, 2.8 KB, 11 ms)</span>
+<span class="ok">200</span> GET  /api/orders?page=1 <span class="dim">(application/json, 474 B, 84 ms)</span>
+<span class="ok">200</span> GET  /api/stats <span class="dim">(application/json, 42 B, 31 ms)</span>
+<span class="ok">200</span> GET  /api/me <span class="dim">(application/json, 50 B, 46 ms)</span>
+<span class="ok">201</span> POST /api/orders/1042/notes <span class="dim">(application/json, 28 B, 120 ms)</span></pre>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section" id="how">
+                <div class="wrap">
+                    <div class="section-head">
+                        <h2>From tab to code in three steps</h2>
+                        <p>
+                            The receiver can be anything that accepts a JSON POST. One is included to get you started.
+                        </p>
+                    </div>
+                    <ol class="steps">
+                        <li>
+                            <h3>Run a receiver</h3>
+                            <p>The repository includes one. It needs Python 3 and nothing else:</p>
+                            <pre class="cmd">python3 examples/receiver.py</pre>
+                            <p>
+                                It prints each request, and can save JSONL or a HAR file that opens in Chrome DevTools.
+                            </p>
+                        </li>
+                        <li>
+                            <h3>Start capture</h3>
+                            <p>
+                                Open the page, click the extension icon and press <b>Start capture</b>. Turn on
+                                <b>Reload the page</b> to catch the requests it makes while loading.
+                            </p>
+                            <p>
+                                Chrome shows a banner while a tab is being captured. Press <b>Stop capture</b> to end
+                                it.
+                            </p>
+                        </li>
+                        <li>
+                            <h3>Use the records</h3>
+                            <p>
+                                Each finished request arrives as one JSON POST. Feed it to tests, mocks, scrapers or
+                                your own debugging tools.
+                            </p>
+                        </li>
+                    </ol>
+                </div>
+            </section>
+
+            <section class="section">
+                <div class="wrap split">
+                    <div>
+                        <div class="section-head">
+                            <h2>One request, one record</h2>
+                            <p>
+                                Field names follow the Chrome DevTools Protocol, so they match what you see in DevTools.
+                                <a href="https://github.com/GanymedeNil/request-pipeline#data-format">Full format</a>
+                            </p>
+                        </div>
+                        <dl class="fields">
+                            <dt>request</dt>
+                            <dd>Method, URL, headers and the complete body, even when it's large.</dd>
+                            <dt>response</dt>
+                            <dd>Status, headers and MIME type.</dd>
+                            <dt>response_body</dt>
+                            <dd>The body as text, or base64 for binary.</dd>
+                            <dt>cookies</dt>
+                            <dd>The cookies Chrome holds for the request's URL.</dd>
+                            <dt>timestamp</dt>
+                            <dd>When it was sent, plus <code>duration_ms</code> for how long it took.</dd>
+                            <dt>schema_version</dt>
+                            <dd>So your code can rely on the shape.</dd>
+                        </dl>
+                    </div>
+                    <pre class="json" aria-label="Example record">{
+  <span class="k">"schema_version"</span>: <span class="n">1</span>,
+  <span class="k">"resource_type"</span>: <span class="s">"Fetch"</span>,
+  <span class="k">"timestamp"</span>: <span class="n">1794795192008</span>,
+  <span class="k">"duration_ms"</span>: <span class="n">120</span>,
+  <span class="k">"request"</span>: {
+    <span class="k">"method"</span>: <span class="s">"POST"</span>,
+    <span class="k">"url"</span>: <span class="s">"https://shop.example/api/orders/1042/notes"</span>,
+    <span class="k">"headers"</span>: {
+      <span class="k">"Authorization"</span>: <span class="s">"[REDACTED]"</span>,
+      <span class="k">"Content-Type"</span>: <span class="s">"application/json"</span> <span class="dim">…</span>
+    },
+    <span class="k">"postData"</span>: <span class="s">"{\"note\":\"Gift wrap, please\"}"</span>
+  },
+  <span class="k">"response"</span>: {
+    <span class="k">"status"</span>: <span class="n">201</span>,
+    <span class="k">"mimeType"</span>: <span class="s">"application/json"</span> <span class="dim">…</span>
+  },
+  <span class="k">"cookies"</span>: [
+    { <span class="k">"name"</span>: <span class="s">"session"</span>, <span class="k">"value"</span>: <span class="s">"[REDACTED]"</span> <span class="dim">…</span> }
+  ],
+  <span class="k">"response_body"</span>: {
+    <span class="k">"body"</span>: <span class="s">"{\"id\":\"n_88\",\"created\":true}"</span>,
+    <span class="k">"base64Encoded"</span>: <span class="n">false</span>
+  }
+}</pre>
+                </div>
+            </section>
+
+            <section class="section">
+                <div class="wrap split">
+                    <figure class="popup-shot">
+                        <img
+                            src="images/popup-options@2x.png"
+                            width="340"
+                            alt="The Request Pipeline popup during a capture, with Options open: reload on start and redaction are on, URLs are limited to */api/*, and bodies are capped at 512 KB."
+                        />
+                    </figure>
+                    <div>
+                        <div class="section-head">
+                            <h2>Decide what leaves the browser</h2>
+                            <p>Everything is in the popup, and changes apply to the next request, even mid-capture.</p>
+                        </div>
+                        <ul class="features">
+                            <li><b>Filter</b> by resource type, URL pattern and HTTP method.</li>
+                            <li><b>Redact</b> cookie values and authorization headers before they're sent.</li>
+                            <li><b>Trim</b> bodies over a size limit to a marker that keeps their length.</li>
+                            <li>
+                                <b>See what happened</b> in live counts, and get a clear error when your server is down.
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <section class="promise">
+                <div class="wrap">
+                    <div class="promise-box">
+                        <h2>Your traffic goes to your server. Nowhere else.</h2>
+                        <div>
+                            <p>
+                                Records go only to the address you set, which is your own computer by default
+                                (127.0.0.1:6789). The extension has no analytics and sends nothing to us.
+                            </p>
+                            <p><a href="privacy.html">Read the privacy policy</a></p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <div class="wrap">
+                <span>Request Pipeline</span>
+                <nav aria-label="Footer">
+                    <a href="privacy.html">Privacy</a>
+                    <a href="terms.html">Terms</a>
+                    <a href="https://github.com/GanymedeNil/request-pipeline">Source</a>
+                    <a href="https://github.com/GanymedeNil/request-pipeline/issues">Report an issue</a>
+                </nav>
+                <p class="legal">
+                    Free software under GPL-3.0. Chrome is a trademark of Google LLC; this project is not affiliated
+                    with Google.
+                </p>
+            </div>
+        </footer>
+    </body>
+</html>
