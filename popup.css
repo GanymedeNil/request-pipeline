@@ -16,3 +16,14 @@ body{
     margin-bottom: 10px;
     margin-top: 10px;
 }
+
+.invalid{
+    outline: 1px solid #d93025;
+}
+
+.status{
+    max-width: 360px;
+    color: #d93025;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
