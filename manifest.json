@@ -2,7 +2,7 @@
   "name": "Request Pipeline",
   "version": "1.3.0",
   "manifest_version": 3,
-  "description": "This is an extension that forwards web interface request information to a specified server",
+  "description": "Stream a tab's network requests and responses to your own server as JSON, for scripts, tests and API debugging.",
   "icons": {
     "16": "images/icon-16.png",
     "32": "images/icon-32.png",

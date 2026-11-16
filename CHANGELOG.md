@@ -13,6 +13,10 @@ When releasing, replace `Unreleased` in the version heading with the release dat
 - A Feedback link in the popup.
 - `examples/receiver.py` prints WebSocket and SSE records and adds WebSocket messages to the HAR file the way Chrome DevTools does.
 
+### Changed
+
+- A clearer extension description, shown in the Chrome Web Store and on `chrome://extensions`.
+
 ### Fixed
 
 - Requests made by cross-site iframes, dedicated and shared workers, and service workers were not captured.

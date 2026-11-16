@@ -27,7 +27,7 @@ export default [
     },
     {
         // Callbacks passed to page.evaluate() run inside the extension's pages.
-        files: ['e2e/**/*.js'],
+        files: ['e2e/**/*.js', 'scripts/store-assets.js'],
         languageOptions: { globals: { ...globals.browser, ...extension } },
     },
 ];
