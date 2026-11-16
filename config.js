@@ -15,6 +15,8 @@ export const DEFAULT_SERVER = 'http://127.0.0.1:6789';
  *   base64 for binary) are replaced by a marker. 0 means no limit.
  * @property {boolean} redact Replace credentials (auth and cookie headers, cookie values) with "[REDACTED]".
  * @property {boolean} reloadOnStart Reload the tab right after capture starts, so page-load requests are included.
+ * @property {boolean} captureWebSocket Forward WebSocket opens, messages, errors and closes as `kind: "websocket"` records.
+ * @property {boolean} captureEventSource Forward EventSource (SSE) messages as `kind: "sse"` records.
  */
 
 /**
@@ -31,6 +33,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
     maxBodyKB: 0,
     redact: false,
     reloadOnStart: false,
+    captureWebSocket: false,
+    captureEventSource: false,
 });
 
 /** Resource types the popup offers as checkboxes. The others keep their default. */

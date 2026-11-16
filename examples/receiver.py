@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Reference receiver for Request Pipeline.
 
-Listens for the records the extension POSTs, prints one line per request, and can also save them:
+Listens for the records the extension POSTs, prints one line per record, and can also save them:
 
     python3 examples/receiver.py                       # print only, on http://127.0.0.1:6789
     python3 examples/receiver.py --jsonl requests.jsonl  # also append each record as a JSON line
     python3 examples/receiver.py --har capture.har     # also keep a HAR file (open it in DevTools)
+
+HTTP records become HAR entries. WebSocket messages are added to their connection's entry the way
+Chrome DevTools exports them (`_webSocketMessages`). EventSource messages have no HAR form, so they
+are only printed and written to JSONL.
 
 Standard library only; Python 3.8+.
 """
@@ -44,8 +48,8 @@ def iso_time(record):
     return moment.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
-def to_har_entry(record):
-    """Converts one Request Pipeline record to a HAR 1.2 entry."""
+def http_har_entry(record):
+    """Converts an HTTP record to a HAR 1.2 entry."""
     request = record.get("request") or {}
     response = record.get("response") or {}
     body = record.get("response_body") or {}
@@ -101,20 +105,100 @@ def to_har_entry(record):
     }
 
 
+def websocket_har_entry(record):
+    """A HAR entry for a WebSocket handshake; its messages are appended to `_webSocketMessages`."""
+    request = record.get("request") or {}
+    response = record.get("response") or {}
+    url = record.get("url", "")
+    return {
+        "startedDateTime": iso_time(record),
+        "time": 0,
+        "request": {
+            "method": "GET",
+            "url": url,
+            "httpVersion": "HTTP/1.1",
+            "cookies": [],
+            "headers": header_list(request.get("headers")),
+            "queryString": [{"name": k, "value": v} for k, v in parse_qsl(urlsplit(url).query, keep_blank_values=True)],
+            "headersSize": -1,
+            "bodySize": 0,
+        },
+        "response": {
+            "status": response.get("status", 0),
+            "statusText": response.get("statusText", ""),
+            "httpVersion": "HTTP/1.1",
+            "cookies": [],
+            "headers": header_list(response.get("headers")),
+            "content": {"size": 0, "mimeType": ""},
+            "redirectURL": "",
+            "headersSize": -1,
+            "bodySize": -1,
+        },
+        "cache": {},
+        "timings": {"send": 0, "wait": 0, "receive": 0},
+        "_resourceType": "websocket",
+        "_webSocketMessages": [],
+    }
+
+
+def websocket_har_message(record):
+    """One `_webSocketMessages` item, in the format Chrome DevTools uses (time in epoch seconds)."""
+    data = record.get("data")
+    message = {
+        "type": "send" if record.get("direction") == "sent" else "receive",
+        "time": (record.get("timestamp") or 0) / 1000,
+        "opcode": record.get("opcode", 1),
+        "data": data if isinstance(data, str) else "",
+    }
+    if record.get("omitted"):
+        message["_omitted"] = f"{record['omitted']}, {record.get('length')} characters"
+    return message
+
+
+def size_text(text, base64_encoded=False):
+    size = len(text) * 3 // 4 if base64_encoded else len(text.encode("utf-8"))
+    return f"{size / 1024:.1f} KB" if size >= 1024 else f"{size} B"
+
+
 def summary(record):
+    kind = record.get("kind", "http")
+    if kind == "websocket":
+        return websocket_summary(record)
+    if kind == "sse":
+        data = record.get("data")
+        size = size_text(data) if isinstance(data, str) else "data omitted"
+        return f"SSE         {record.get('url', '')}  (event: {record.get('event_name') or 'message'}, {size})"
+
     request = record.get("request") or {}
     response = record.get("response") or {}
     body = record.get("response_body") or {}
     text = body.get("body")
     if isinstance(text, str):
-        size = len(text) * 3 // 4 if body.get("base64Encoded") else len(text.encode("utf-8"))
-        size_text = f"{size / 1024:.1f} KB" if size >= 1024 else f"{size} B"
+        body_size = size_text(text, body.get("base64Encoded"))
     else:
-        size_text = "body omitted" if body.get("omitted") else "no body"
-    details = [response.get("mimeType") or "?", size_text]
+        body_size = "body omitted" if body.get("omitted") else "no body"
+    details = [response.get("mimeType") or "?", body_size]
     if record.get("duration_ms") is not None:
         details.append(f"{record['duration_ms']} ms")
+    if record.get("target_type") not in (None, "page"):
+        details.append(f"from {record['target_type']}")
     return f"{response.get('status', '---'):>3} {request.get('method', '?'):<7} {request.get('url', '')}  ({', '.join(details)})"
+
+
+def websocket_summary(record):
+    url = record.get("url", "")
+    event = record.get("event")
+    if event == "open":
+        return f"{(record.get('response') or {}).get('status', '---'):>3} WS      {url}  (open)"
+    if event == "message":
+        arrow = "->" if record.get("direction") == "sent" else "<-"
+        data = record.get("data")
+        kind = "binary" if record.get("opcode") == 2 else "text"
+        size = size_text(data, record.get("base64Encoded")) if isinstance(data, str) else "data omitted"
+        return f"    WS {arrow}   {url}  ({kind}, {size})"
+    if event == "error":
+        return f"    WS !    {url}  (error: {record.get('error_message', '')})"
+    return f"    WS      {url}  (closed)"
 
 
 class Sink:
@@ -125,6 +209,8 @@ class Sink:
         self.jsonl_path = jsonl_path
         self.har_path = har_path
         self.har_entries = []
+        # (tab_id, request_id) of a WebSocket -> its HAR entry, for appending messages.
+        self.websockets = {}
         if har_path and os.path.exists(har_path):
             with open(har_path, encoding="utf-8") as f:
                 self.har_entries = json.load(f)["log"]["entries"]
@@ -135,9 +221,29 @@ class Sink:
             if self.jsonl_path:
                 with open(self.jsonl_path, "a", encoding="utf-8") as f:
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
-            if self.har_path:
-                self.har_entries.append(to_har_entry(record))
+            if self.har_path and self._add_to_har(record):
                 self._write_har()
+
+    def _add_to_har(self, record):
+        """Returns whether the HAR changed."""
+        kind = record.get("kind", "http")
+        if kind == "http":
+            self.har_entries.append(http_har_entry(record))
+            return True
+        if kind == "websocket":
+            socket = (record.get("tab_id"), record.get("request_id"))
+            if record.get("event") == "open":
+                entry = websocket_har_entry(record)
+                self.websockets[socket] = entry
+                self.har_entries.append(entry)
+                return True
+            entry = self.websockets.get(socket)
+            if record.get("event") == "message" and entry is not None:
+                entry["_webSocketMessages"].append(websocket_har_message(record))
+                return True
+            if record.get("event") == "close":
+                self.websockets.pop(socket, None)
+        return False
 
     def _write_har(self):
         har = {

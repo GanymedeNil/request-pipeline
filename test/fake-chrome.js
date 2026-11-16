@@ -46,8 +46,11 @@ export function createFakeChrome({ local = {}, session = {} } = {}) {
     const attached = new Set();
     const commands = [];
     // method -> (target, params) => result | Promise<result>; throw to simulate a CDP error.
+    // `target` is the debugger session: { tabId, sessionId? }.
     const handlers = {
         'Network.enable': () => ({}),
+        'Target.setAutoAttach': () => ({}),
+        'Runtime.runIfWaitingForDebugger': () => ({}),
         'Network.getCookies': () => ({ cookies: [{ name: 'sid', value: 'abc' }] }),
         'Network.getResponseBody': (target, { requestId }) => ({ body: `body-${requestId}`, base64Encoded: false }),
         'Network.getRequestPostData': (target, { requestId }) => ({ postData: `post-${requestId}` }),
@@ -99,7 +102,7 @@ export function createFakeChrome({ local = {}, session = {} } = {}) {
                 }
             },
             async sendCommand(target, method, params = {}) {
-                commands.push({ tabId: target.tabId, method, params });
+                commands.push({ tabId: target.tabId, sessionId: target.sessionId, method, params });
                 if (!attached.has(target.tabId)) {
                     throw new Error(`Debugger is not attached to the tab with id: ${target.tabId}.`);
                 }
@@ -124,8 +127,17 @@ export function createFakeChrome({ local = {}, session = {} } = {}) {
         message(msg) {
             return new Promise((resolve) => onMessage.emit(msg, {}, resolve));
         },
-        event(tabId, method, params) {
-            onEvent.emit({ tabId }, method, params);
+        // An event from the tab, or from one of its child targets when `sessionId` is given.
+        event(tabId, method, params, sessionId) {
+            onEvent.emit(sessionId === undefined ? { tabId } : { tabId, sessionId }, method, params);
+        },
+        // Chrome auto-attaching a new iframe or worker of the tab.
+        attachChild(tabId, sessionId, type = 'iframe', { waitingForDebugger = true, parentSessionId } = {}) {
+            onEvent.emit(
+                parentSessionId === undefined ? { tabId } : { tabId, sessionId: parentSessionId },
+                'Target.attachedToTarget',
+                { sessionId, targetInfo: { targetId: `target-${sessionId}`, type, url: '' }, waitingForDebugger },
+            );
         },
         // What Chrome does when the user clicks Cancel on the banner or closes the tab.
         externalDetach(tabId, reason = 'canceled_by_user') {
@@ -137,6 +149,15 @@ export function createFakeChrome({ local = {}, session = {} } = {}) {
 
 // Lets queued promise chains and timers run.
 export const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+let instance = 0;
+// Evaluates background.js afresh against `fake`, like a service worker (re)start.
+export async function loadBackground(fake) {
+    globalThis.chrome = fake.chrome;
+    const module = await import(`../background.js?instance=${++instance}`);
+    await settle();
+    return module;
+}
 
 // Replays the events Chrome emits for one request. `startTime` is in seconds, like CDP timestamps.
 export function replayRequest(
@@ -153,29 +174,74 @@ export function replayRequest(
         startTime = 100,
         duration = 0.25,
         documentURL = 'https://page.test/',
+        sessionId,
     },
 ) {
-    fake.event(tabId, 'Network.requestWillBeSent', {
-        requestId,
-        type,
-        documentURL,
+    fake.event(
+        tabId,
+        'Network.requestWillBeSent',
+        {
+            requestId,
+            type,
+            documentURL,
+            timestamp: startTime,
+            wallTime: 1700000000 + startTime,
+            request: { url, method, headers: {}, ...request },
+        },
+        sessionId,
+    );
+    fake.event(
+        tabId,
+        'Network.responseReceived',
+        {
+            requestId,
+            type,
+            timestamp: startTime + duration / 2,
+            response: { url, status: 200, headers: {}, ...response },
+        },
+        sessionId,
+    );
+    if (finish === 'loadingFinished') {
+        fake.event(tabId, 'Network.loadingFinished', { requestId, timestamp: startTime + duration }, sessionId);
+    } else if (finish === 'loadingFailed') {
+        fake.event(
+            tabId,
+            'Network.loadingFailed',
+            { requestId, timestamp: startTime + duration, errorText: 'net::ERR_FAILED' },
+            sessionId,
+        );
+    }
+}
+
+/**
+ * Replays a WebSocket's life: creation, handshake, then `frames` as [direction, opcode, payload],
+ * and a close unless `close` is false. CDP times are seconds; wall clock = time + 1700000000.
+ */
+export function replayWebSocket(
+    fake,
+    tabId,
+    { requestId, url, frames = [], close = true, sessionId, created = true, startTime = 200 },
+) {
+    const event = (method, params) => fake.event(tabId, method, { requestId, ...params }, sessionId);
+    if (created) {
+        event('Network.webSocketCreated', { url });
+    }
+    event('Network.webSocketWillSendHandshakeRequest', {
         timestamp: startTime,
         wallTime: 1700000000 + startTime,
-        request: { url, method, headers: {}, ...request },
+        request: { headers: { Cookie: 'sid=abc', 'Sec-WebSocket-Version': '13' } },
     });
-    fake.event(tabId, 'Network.responseReceived', {
-        requestId,
-        type,
-        timestamp: startTime + duration / 2,
-        response: { url, status: 200, headers: {}, ...response },
+    event('Network.webSocketHandshakeResponseReceived', {
+        timestamp: startTime + 0.01,
+        response: { status: 101, statusText: 'Switching Protocols', headers: { Upgrade: 'websocket' } },
     });
-    if (finish === 'loadingFinished') {
-        fake.event(tabId, 'Network.loadingFinished', { requestId, timestamp: startTime + duration });
-    } else if (finish === 'loadingFailed') {
-        fake.event(tabId, 'Network.loadingFailed', {
-            requestId,
-            timestamp: startTime + duration,
-            errorText: 'net::ERR_FAILED',
+    frames.forEach(([direction, opcode, payloadData], i) => {
+        event(direction === 'sent' ? 'Network.webSocketFrameSent' : 'Network.webSocketFrameReceived', {
+            timestamp: startTime + 1 + i,
+            response: { opcode, mask: direction === 'sent', payloadData },
         });
+    });
+    if (close) {
+        event('Network.webSocketClosed', { timestamp: startTime + 10 });
     }
 }
