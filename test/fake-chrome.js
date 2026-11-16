@@ -10,18 +10,31 @@ function createEvent() {
     };
 }
 
-function createStorageArea(initial = {}) {
-    const data = { ...initial };
+function createStorageArea(area, initial, onChanged) {
+    const data = structuredClone(initial);
     return {
         data,
-        async get(key) {
-            return key in data ? { [key]: data[key] } : {};
+        // Accepts a key, or an object of defaults like chrome.storage does.
+        async get(keys) {
+            if (typeof keys === 'string') {
+                return keys in data ? { [keys]: structuredClone(data[keys]) } : {};
+            }
+            return Object.fromEntries(Object.entries(keys).map(
+                ([key, fallback]) => [key, structuredClone(key in data ? data[key] : fallback)],
+            ));
         },
         async set(items) {
-            Object.assign(data, items);
+            const changes = {};
+            for (const [key, value] of Object.entries(items)) {
+                changes[key] = { oldValue: data[key], newValue: structuredClone(value) };
+                data[key] = structuredClone(value);
+            }
+            onChanged.emit(changes, area);
         },
         async remove(key) {
+            const changes = { [key]: { oldValue: data[key] } };
             delete data[key];
+            onChanged.emit(changes, area);
         },
     };
 }
@@ -41,13 +54,30 @@ export function createFakeChrome({ local = {}, session = {} } = {}) {
     const onEvent = createEvent();
     const onDetach = createEvent();
     const onMessage = createEvent();
+    const onStorageChanged = createEvent();
+    const reloads = [];
+    const badge = { text: '', color: null };
 
     const chrome = {
         storage: {
-            local: createStorageArea(local),
-            session: createStorageArea(session),
+            local: createStorageArea('local', local, onStorageChanged),
+            session: createStorageArea('session', session, onStorageChanged),
+            onChanged: onStorageChanged,
         },
         runtime: { onMessage },
+        tabs: {
+            async reload(tabId) {
+                reloads.push({ tabId, attached: attached.has(tabId), commands: commands.length });
+            },
+        },
+        action: {
+            async setBadgeText({ text }) {
+                badge.text = text;
+            },
+            async setBadgeBackgroundColor({ color }) {
+                badge.color = color;
+            },
+        },
         debugger: {
             onEvent,
             onDetach,
@@ -85,6 +115,8 @@ export function createFakeChrome({ local = {}, session = {} } = {}) {
         commands,
         handlers,
         attachErrors,
+        reloads,
+        badge,
         // Send a message as the popup would and resolve with the service worker's response.
         message(msg) {
             return new Promise((resolve) => onMessage.emit(msg, {}, resolve));
@@ -103,21 +135,28 @@ export function createFakeChrome({ local = {}, session = {} } = {}) {
 // Lets queued promise chains and timers run.
 export const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-// Replays the events Chrome emits for one request.
-export function replayRequest(fake, tabId, { requestId, url, type = 'XHR', method = 'GET', request = {}, finish = 'loadingFinished' }) {
+// Replays the events Chrome emits for one request. `startTime` is in seconds, like CDP timestamps.
+export function replayRequest(fake, tabId, {
+    requestId, url, type = 'XHR', method = 'GET', request = {}, response = {}, finish = 'loadingFinished',
+    startTime = 100, duration = 0.25, documentURL = 'https://page.test/',
+}) {
     fake.event(tabId, 'Network.requestWillBeSent', {
         requestId,
         type,
+        documentURL,
+        timestamp: startTime,
+        wallTime: 1700000000 + startTime,
         request: { url, method, headers: {}, ...request },
     });
     fake.event(tabId, 'Network.responseReceived', {
         requestId,
         type,
-        response: { url, status: 200, headers: {} },
+        timestamp: startTime + duration / 2,
+        response: { url, status: 200, headers: {}, ...response },
     });
     if (finish === 'loadingFinished') {
-        fake.event(tabId, 'Network.loadingFinished', { requestId });
+        fake.event(tabId, 'Network.loadingFinished', { requestId, timestamp: startTime + duration });
     } else if (finish === 'loadingFailed') {
-        fake.event(tabId, 'Network.loadingFailed', { requestId, errorText: 'net::ERR_FAILED' });
+        fake.event(tabId, 'Network.loadingFailed', { requestId, timestamp: startTime + duration, errorText: 'net::ERR_FAILED' });
     }
 }

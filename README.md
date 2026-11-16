@@ -52,38 +52,76 @@ At this point, all the necessary data are obtained.
 
 ### One more thing
 
-Only http(s) requests are forwarded. Static assets (stylesheets, scripts, images, fonts, media, manifests and CORS preflights) are filtered out by their [resource type](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-ResourceType), so documents, XHR/fetch calls and everything else get through. In fact, you can also capture WebSocket content according to the Debugger documentation, and you are welcome to contribute to the functionality!
+Only http(s) requests are forwarded. By default, static assets (stylesheets, scripts, images, fonts, media, manifests and CORS preflights) are filtered out by their [resource type](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-ResourceType); you can change this under **Options**. In fact, you can also capture WebSocket content according to the Debugger documentation, and you are welcome to contribute to the functionality!
 
 ## Install
 
 - [chrome web store](https://chrome.google.com/webstore/detail/request-pipeline/kkaplobblnfnadlodpgdehhieofppead)
 - If you want to use it right away, you can clone this repository, then click the Load unzipped extensions button in the chrome extension manager and select the plugin directory in the window that opens to use it.
 
+## Quick start
+
+The extension sends each captured request to a server you run. A ready-made one is included (Python 3.8+, no dependencies):
+
+```bash
+python3 examples/receiver.py
+```
+
+It listens on `http://127.0.0.1:6789`, the extension's default address, and prints one line per request:
+
+```
+200 GET     https://api.example.com/orders  (application/json, 1.2 KB, 85 ms)
+```
+
+To keep what you capture, add `--jsonl requests.jsonl` (one record per line) and/or `--har capture.har` (a HAR file you can open in Chrome DevTools or other HTTP tools). Use `--port` to listen elsewhere.
+
 ## Use
 
 ![use](./asset/image/use.jpg)
 
+1. Click the extension's icon to open the popup. If you don't see it in the toolbar, click the puzzle icon, find Request Pipeline and pin it.
+2. Pick the **Tab** to capture (the current tab is preselected) and click **Start capture**. Chrome shows a "Request Pipeline started debugging this browser" banner; **don't press Cancel on it while you want to capture**.
+3. Click **Stop capture** when you're done (Cancel on the banner, or closing the tab, also stops it).
 
+<img src="./asset/image/popup.png" width="340" align="right" alt="The popup while capturing, with Options expanded">
 
-1. Clicking on the extension will bring up the popup page for this extension. If you don't see this extension in the extension bar, you need to click on the extension icon (like a puzzle icon) and then find this extension and click on it.
-   It is highly recommended that you fix this extension in the extension bar to make it easier to use later (just click on the extension icon and find it in the list and click on the pin button next to it).
-2. This extension has only two actionable options. ***Server Address*** means which processor you want to send the captured request data to. ***Select Tabs*** means the tab you want to capture the request. When you select the corresponding tab, chrome will pop up a "Request Pipeline started debugging this browser" reminder, **in Do not press Cancel during the capture request**.
-3. When you want to stop capturing requests, choose *not capturing* in the popup or click the Cancel button on the banner.
+While capturing, the popup shows how many requests were forwarded, failed to send, or skipped (no response body available), and the toolbar badge shows the forwarded count. The badge turns red if forwarding fails; the popup then shows the error.
 
-The server address is saved as you type and applies right away, including to a capture that is already running. Leave it empty to stop forwarding. If forwarding fails (for example, the server isn't running), the popup shows the last error.
+**Server address** is where records are POSTed. It's saved as you type and applies right away, including to a running capture. Leave it empty to stop forwarding. If it points anywhere other than this computer, the popup warns you, since records include cookies and auth headers unless you turn on redaction.
+
+**Options**, all applied immediately:
+
+- **Reload the page when capture starts**: catches the requests a page makes while loading.
+- **Redact credentials**: replaces the values of `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `X-Auth-Token`, `X-CSRF-Token` and `X-XSRF-Token` headers, and all cookie values, with `[REDACTED]`. URLs and bodies are not changed.
+- **Forward these resource types**: which kinds of requests are sent.
+- **Only URLs matching / Skip URLs matching**: one pattern per line. `*` matches anything, so `https://api.example.com/*` matches the whole URL; a pattern without `*` matches any URL containing it. Skip wins over Only.
+- **Methods**: e.g. `GET, POST`. Empty means all.
+- **Max body**: request and response bodies longer than this many KB are replaced by a marker (see below). 0 means no limit.
+
+<br clear="right">
 
 ### Data format
 
-The request sent by the extension is **POST**, and the data format is **JSON**. The specific format is as follows:
+The request sent by the extension is **POST**, and the data format is **JSON**, one request per POST:
 
-| FIELD         | TYPE                                                         | NOTE                                                         |
-| ------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| **cookies**   | **array**[ [Cookie](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-Cookie) ] | https://chromedevtools.github.io/devtools-protocol/tot/Network/#method-getCookies |
-|  **request**       | [Request](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-Request) | https://chromedevtools.github.io/devtools-protocol/tot/Network/#event-requestWillBeSent |
-|  **response**      | [Response](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-Response) | https://chromedevtools.github.io/devtools-protocol/tot/Network/#event-responseReceived |
-| **response_body** | **map**                                                          | https://chromedevtools.github.io/devtools-protocol/tot/Network/#method-getResponseBody |
+| FIELD             | TYPE | NOTE |
+| ----------------- | ---- | ---- |
+| **schema_version** | **number** | `1`. Records from versions before 1.2 don't have this field. |
+| **request_id**    | **string** | The Chrome DevTools request ID, unique within a tab. |
+| **tab_id**        | **number** | The captured tab. |
+| **document_url**  | **string** | URL of the document that made the request. |
+| **resource_type** | **string** | [ResourceType](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-ResourceType), e.g. `XHR`, `Fetch`, `Document`. |
+| **timestamp**     | **number** | When the request was sent, in milliseconds since the Unix epoch. |
+| **duration_ms**   | **number** | From sending the request to the response finishing. |
+| **request**       | [Request](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-Request) | https://chromedevtools.github.io/devtools-protocol/tot/Network/#event-requestWillBeSent |
+| **response**      | [Response](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-Response) | https://chromedevtools.github.io/devtools-protocol/tot/Network/#event-responseReceived |
+| **cookies**       | **array**[ [Cookie](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-Cookie) ] | https://chromedevtools.github.io/devtools-protocol/tot/Network/#method-getCookies |
+| **response_body** | **object** `{ body, base64Encoded }` | https://chromedevtools.github.io/devtools-protocol/tot/Network/#method-getResponseBody |
 
-`request.postData` contains the full request body, including bodies too large for Chrome to include in the event. `cookies` is left out if Chrome couldn't return them. Requests whose response body Chrome no longer has (redirects, evicted buffers) are not forwarded.
+- `request.postData` contains the full request body, including bodies too large for Chrome to include in the event.
+- `cookies` is left out if Chrome couldn't return them.
+- Requests whose response body Chrome no longer has (redirects, evicted buffers) are not forwarded; they count as *skipped*.
+- When a body is over the **Max body** limit, `response_body` becomes `{ "body": null, "base64Encoded": …, "omitted": "too_large", "length": <characters> }`, and the request gets `"postData": null, "postDataOmitted": "too_large", "postDataLength": <characters>`.
 
 ## Development
 
@@ -91,9 +129,7 @@ The request sent by the extension is **POST**, and the data format is **JSON**. 
 npm test
 ```
 
-The tests replay Chrome DevTools Protocol event sequences against `background.js` with a fake `chrome` API. They need Node.js 22 or later and no dependencies.
-
-
+The tests replay Chrome DevTools Protocol event sequences against `background.js` with a fake `chrome` API, and unit-test the filter and redaction logic in `lib/`. They need Node.js 22 or later and no dependencies.
 
 ## reference
 
