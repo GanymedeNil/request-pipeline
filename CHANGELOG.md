@@ -4,7 +4,7 @@ Notable changes to Request Pipeline. The format follows [Keep a Changelog](https
 
 When releasing, replace `Unreleased` in the version heading with the release date (`YYYY-MM-DD`); the release workflow uses that section as the release notes.
 
-## [1.2.0] - Unreleased
+## [1.2.0] - 2026-11-16
 
 1.1.0 was never published on its own; its fixes ship in this release.
 
@@ -47,7 +47,7 @@ When releasing, replace `Unreleased` in the version heading with the release dat
 
 First release.
 
-[1.2.0]: https://github.com/GanymedeNil/request-pipeline/compare/v1.0.2...HEAD
+[1.2.0]: https://github.com/GanymedeNil/request-pipeline/compare/v1.0.2...v1.2.0
 [1.0.2]: https://github.com/GanymedeNil/request-pipeline/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/GanymedeNil/request-pipeline/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/GanymedeNil/request-pipeline/releases/tag/v1.0.0
