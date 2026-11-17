@@ -1,5 +1,6 @@
-// The website's privacy policy says it loads nothing from other sites; these tests hold it to that,
-// and check that every local link, image, font and anchor resolves in the built site.
+// The privacy policy says the site's own pages load nothing from other sites (Cloudflare, which serves
+// the domain, adds its own scripts; the policy discloses those). These tests hold the pages to that, and
+// check that every local link, image, font and anchor resolves in the built site.
 
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
