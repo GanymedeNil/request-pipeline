@@ -1,115 +1,152 @@
 <p align="center">
-  <img src="./images/icon-128.png">
-  <h1 align="center">Request Pipeline</h1>
+  <img src="images/icon-128.png" width="96" height="96" alt="">
 </p>
-Website: [www.ganymedenil.com/request-pipeline](https://www.ganymedenil.com/request-pipeline/) · [Privacy policy](https://www.ganymedenil.com/request-pipeline/privacy.html) · [Terms](https://www.ganymedenil.com/request-pipeline/terms.html)
 
-This is a chrome extension that forwards the content of network requests on web pages to the processing server.This extension can better help development engineers or test engineers understand the specifics of interface requests and responses in web pages.
+<h1 align="center">Request Pipeline</h1>
 
-## Under the hood
+<p align="center">
+  <b>Pipe a tab's network traffic into your own code.</b><br>
+  A Chrome extension that forwards each request a tab makes, with headers, bodies, cookies and timing, to a server you run, as JSON, while you browse.
+</p>
 
-The main reason this tool uses the chrome extension as a development platform is that you don't have to use a development tool to simulate the entire workflow of the site (for example, you need to log in when getting some data). With this plugin you just need to visit the page you want to get the web request in the explorer normally, then open this plugin and you can get the data you need.
+<p align="center">
+  <a href="https://chromewebstore.google.com/detail/request-pipeline/kkaplobblnfnadlodpgdehhieofppead"><b>Add to Chrome</b></a> ·
+  <a href="https://www.ganymedenil.com/request-pipeline/">Website</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="https://www.ganymedenil.com/request-pipeline/privacy.html">Privacy</a>
+</p>
 
-The chrome extension does not have an API that can directly obtain all requests from web pages, but there are usually two ways to achieve this function.
+<p align="center">
+  <a href="https://chromewebstore.google.com/detail/request-pipeline/kkaplobblnfnadlodpgdehhieofppead"><img src="https://img.shields.io/chrome-web-store/v/kkaplobblnfnadlodpgdehhieofppead?label=Chrome%20Web%20Store" alt="Chrome Web Store version"></a>
+  <a href="https://chromewebstore.google.com/detail/request-pipeline/kkaplobblnfnadlodpgdehhieofppead"><img src="https://img.shields.io/chrome-web-store/users/kkaplobblnfnadlodpgdehhieofppead" alt="Chrome Web Store users"></a>
+  <a href="https://github.com/GanymedeNil/request-pipeline/actions/workflows/ci.yml"><img src="https://github.com/GanymedeNil/request-pipeline/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/GanymedeNil/request-pipeline" alt="License: GPL-3.0"></a>
+</p>
 
-1. By extending the ability to inject javascript into the webpage, this implementation method is to inject javascript code into the header of the target webpage, and the main content of the javascript code is to hijack the xhr request of the webpage. But there is also a problem. When the request is generated before the dom node of the web page, this method cannot be captured.
-2. Another method is based on `chrome.devtools.network` API, which is more convenient, but the only problem is that you need to keep devtools open during the capture request. Because this API can only be called in the devtools toolbar.
+<p align="center">
+  <img src="store/images/screenshot-1-capture.png" width="840" alt="A shop page being captured: the Request Pipeline popup shows 8 requests forwarded, and the receiver in a terminal prints one line per request.">
+</p>
 
-What I am currently implementing is based on the debugger API, which is actually used for remote debugging of applications that support Chrome DevTools Protocol. Chrome itself supports this protocol.
+## Why Request Pipeline
 
-The debugger API mainly requires two steps, Attaches debugger to the given target and Detaches debugger from the given target.
+- **Works in the tab you already have open.** Signed in, with real data. No proxy, no certificates, no DevTools left open.
+- **Streams, not exports.** Each request reaches your code as soon as it finishes, so scripts, tests and tools can react while you browse.
+- **Complete records.** Full request bodies (even large ones), response bodies, cookies and timing, in the shape of the Chrome DevTools Protocol.
+- **Your data stays yours.** Records go only to the server address you set, your own computer by default. The extension has no analytics and sends nothing to the developer.
 
-After attaching the debugger to a given target, we can use `sendCommand` method to issue instructions to the debugger.For specific commands that can be used, refer to [here](https://chromedevtools.github.io/devtools-protocol/).
-
-This extension mainly focuses on the [debugger's Network](https://chromedevtools.github.io/devtools-protocol/tot/Network/)。
-
-First we need to enable network tracking, the `Network.enable` command.
-
-Then we need to catch the debugger event, through `chrome.debugger.onEvent`.
-
-Finally filter the event content I need.
-
-### About Debugger Network Event
-
-A network request is split into many events in the debugger. Take the HTTP network request as an example:
-
-- `Network.dataReceived` is fired when data chunk was received over the network.
-- `Network.eventSourceMessageReceived` is fired when EventSource message is received.
-- `Network.loadingFailed` is fired when HTTP request has failed to load.
-- `Network.loadingFinished` is fired when HTTP request has finished loading.
-- `Network.requestServedFromCache` is fired if request ended up loading from cache.
-- `Network.requestWillBeSent` is fired when page is about to send HTTP request.
-- `Network.responseReceived` is fired when HTTP response is available.
-- and more
-
-The three main events I use in this extension are `Network.requestWillBeSent`, `Network.responseReceived`, and `Network.loadingFinished`.
-
-`Network.requestWillBeSent` in this event I get the request submit data.
-
-`Network.responseReceived` in this event I get response data and cookies.
-
-`Network.loadingFinished` In this event, I get the response body data through the `Network.getResponseBody` method, because this is the last of all events.
-
-At this point, all the necessary data are obtained.
-
-### One more thing
-
-Only http(s) requests are forwarded. By default, static assets (stylesheets, scripts, images, fonts, media, manifests and CORS preflights) are filtered out by their [resource type](https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-ResourceType); you can change this under **Options**.
-
-Cross-site iframes and workers run as separate debugging targets, so the tab's own session doesn't see their traffic. The extension uses `Target.setAutoAttach` to attach to each one as it starts (pausing it until its network tracking is on), so their requests are captured too. WebSocket messages (`Network.webSocketFrameSent` / `Received`) and EventSource messages (`Network.eventSourceMessageReceived`) can be forwarded as well; see **Options** below.
-
-## Install
-
-- [chrome web store](https://chrome.google.com/webstore/detail/request-pipeline/kkaplobblnfnadlodpgdehhieofppead)
-- If you want to use it right away, you can clone this repository, then click the Load unzipped extensions button in the chrome extension manager and select the plugin directory in the window that opens to use it.
+People use it to record API traffic for mocks and tests, collect data from pages they can only reach when logged in, see exactly what a web app sends, and save sessions as HAR files.
 
 ## Quick start
 
-The extension sends each captured request to a server you run. A ready-made one is included (Python 3.8+, no dependencies):
+1. **Install** Request Pipeline from the [Chrome Web Store](https://chromewebstore.google.com/detail/request-pipeline/kkaplobblnfnadlodpgdehhieofppead) and pin it to the toolbar.
+2. **Run a receiver.** Any HTTP endpoint that accepts a JSON POST works; this repository includes one that needs only Python 3.8+:
 
-```bash
-python3 examples/receiver.py
-```
+   ```bash
+   python3 examples/receiver.py
+   ```
 
-It listens on `http://127.0.0.1:6789`, the extension's default address, and prints one line per request:
+   It listens on `http://127.0.0.1:6789`, the extension's default address, and prints one line per request:
 
-```
-200 GET     https://api.example.com/orders  (application/json, 1.2 KB, 85 ms)
-```
+   ```
+   200 GET     https://api.example.com/orders  (application/json, 1.2 KB, 85 ms)
+   ```
 
-To keep what you capture, add `--jsonl requests.jsonl` (one record per line) and/or `--har capture.har` (a HAR file you can open in Chrome DevTools or other HTTP tools; WebSocket messages are stored on their connection's entry the way DevTools exports them). Use `--port` to listen elsewhere.
+   Add `--jsonl requests.jsonl` to keep every record, or `--har capture.har` for a HAR file that opens in Chrome DevTools.
+3. **Capture.** Open the page, click the extension icon and press **Start capture**. Turn on **Reload the page** under Options to catch the requests it makes while loading. Press **Stop capture** when you're done.
 
-## Use
+While a tab is captured, Chrome shows a "Request Pipeline started debugging this browser" banner. That's how Chrome's debugger API works; pressing Cancel on it stops the capture.
 
-![use](./asset/image/use.jpg)
+## Features
 
-1. Click the extension's icon to open the popup. If you don't see it in the toolbar, click the puzzle icon, find Request Pipeline and pin it.
-2. Pick the **Tab** to capture (the current tab is preselected) and click **Start capture**. Chrome shows a "Request Pipeline started debugging this browser" banner; **don't press Cancel on it while you want to capture**.
-3. Click **Stop capture** when you're done (Cancel on the banner, or closing the tab, also stops it).
+<img src="store/images/popup-options@2x.png" width="340" align="right" alt="The popup during a capture with Options open: reload on start and redaction on, URLs limited to */api/*, bodies capped at 512 KB.">
 
-<img src="./asset/image/popup.png" width="340" align="right" alt="The popup while capturing, with Options expanded">
+**Capture**
+- Documents, XHR and fetch calls by default; scripts, stylesheets, images, fonts and media when you want them.
+- Full request bodies, response bodies (base64 for binary), cookies, timing and the page that made each request.
+- *New in 1.3:* requests from cross-site iframes and web workers, and WebSocket and EventSource (SSE) messages.
 
-While capturing, the popup shows how many records were forwarded, failed to send, or skipped (no response body available), and the toolbar badge shows the forwarded count. The badge turns red if forwarding fails; the popup then shows the error.
+**Control**
+- Filter by resource type, URL pattern and HTTP method.
+- Redact cookie values and authorization headers before they're sent.
+- Replace bodies over a size limit with a marker that keeps their length.
+- Every setting applies to the next request, even in the middle of a capture.
 
-**Server address** is where records are POSTed. It's saved as you type and applies right away, including to a running capture. Leave it empty to stop forwarding. If it points anywhere other than this computer, the popup warns you, since records include cookies and auth headers unless you turn on redaction.
-
-**Options**, all applied immediately:
-
-- **Reload the page when capture starts**: catches the requests a page makes while loading.
-- **Redact credentials**: replaces the values of `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `X-Auth-Token`, `X-CSRF-Token` and `X-XSRF-Token` headers, and all cookie values, with `[REDACTED]`. URLs and bodies are not changed.
-- **Forward these resource types**: which kinds of requests are sent.
-- **Only URLs matching / Skip URLs matching**: one pattern per line. `*` matches anything, so `https://api.example.com/*` matches the whole URL; a pattern without `*` matches any URL containing it. Skip wins over Only.
-- **Methods**: e.g. `GET, POST`. Empty means all.
-- **Max body**: request and response bodies, and WebSocket and SSE message data, longer than this many KB are replaced by a marker (see below). 0 means no limit.
-- **Forward WebSocket messages** / **Forward EventSource (SSE) messages**: off by default. Each socket open, message, error and close, and each SSE message, is sent as its own record (see below). URL patterns, the size limit and redaction apply. Only sockets and streams opened after capture starts are seen, so combine this with **Reload the page** to catch those a page opens while loading.
+**Visibility**
+- Live counts of forwarded, failed and skipped requests, and a counter on the toolbar icon that turns red when sending fails.
+- A clear error when your server is down, and a warning when the server address isn't on your computer or isn't encrypted.
 
 <br clear="right">
 
-### Data format
+### Options
+
+| Option | What it does |
+| --- | --- |
+| **Server address** | Where records are POSTed. Saved as you type and applied right away. Leave it empty to stop forwarding. |
+| **Reload the page when capture starts** | Catches the requests a page makes while loading. |
+| **Redact credentials** | Replaces the values of `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `X-Auth-Token`, `X-CSRF-Token` and `X-XSRF-Token` headers, and all cookie values, with `[REDACTED]`. URLs and bodies are not changed. |
+| **Forward these resource types** | Which kinds of requests are sent. |
+| **Only URLs matching / Skip URLs matching** | One pattern per line. `*` matches anything, so `https://api.example.com/*` matches the whole URL; a pattern without `*` matches any URL containing it. Skip wins over Only. |
+| **Methods** | For example `GET, POST`. Empty means all. |
+| **Max body** | Bodies and message data longer than this many KB are replaced by a marker. 0 means no limit. |
+| **Forward WebSocket messages** / **Forward EventSource (SSE) messages** | *1.3.* Off by default. Each socket open, message, error and close, and each SSE message, is sent as its own record. Only sockets and streams opened after capture starts are seen. |
+
+## What your server receives
+
+One JSON POST per request. A trimmed example, with redaction on:
+
+```json
+{
+  "schema_version": 1,
+  "resource_type": "Fetch",
+  "timestamp": 1794795192008,
+  "duration_ms": 120,
+  "request": {
+    "method": "POST",
+    "url": "https://shop.example/api/orders/1042/notes",
+    "headers": { "Authorization": "[REDACTED]", "Content-Type": "application/json" },
+    "postData": "{\"note\":\"Gift wrap, please\"}"
+  },
+  "response": { "status": 201, "mimeType": "application/json", "headers": { "...": "..." } },
+  "cookies": [{ "name": "session", "value": "[REDACTED]", "...": "..." }],
+  "response_body": { "body": "{\"id\":\"n_88\",\"created\":true}", "base64Encoded": false }
+}
+```
+
+Every field is described under [Data format](#data-format).
+
+## Privacy
+
+The extension reads the network traffic of the tab you choose, only while you're capturing it, and sends it only to the server address you set. Nothing goes to the developer: no analytics, no telemetry, no remote code. Records can contain cookies and auth headers, so forward them only to servers you trust, or turn on **Redact credentials**. The full [privacy policy](https://www.ganymedenil.com/request-pipeline/privacy.html) explains what is read, sent and stored, and why each permission is needed.
+
+## FAQ
+
+**Why does Chrome say the extension "started debugging this browser"?**
+Request Pipeline uses Chrome's debugger API, the same one DevTools uses, because it's the only extension API that can read response bodies, including those of requests made before the page's own scripts run, without DevTools open. Chrome always shows this banner while it's in use, and pressing Cancel on it stops the capture.
+
+**Does it work on pages behind a login?**
+Yes. It captures the tab you're using, with your session, so you don't need to recreate a login in another tool.
+
+**Why are some requests counted as skipped?**
+Their response body was no longer available from Chrome, which happens with redirects and with bodies Chrome has already discarded. They aren't forwarded.
+
+**Can I capture pages I've already loaded?**
+Requests made before you press Start capture aren't seen. Turn on **Reload the page when capture starts** to catch everything from the first request.
+
+**Which browsers does it support?**
+Chrome. Other Chromium-based browsers that support Manifest V3 extensions and the debugger API may work, but aren't tested.
+
+**Can I write my own receiver?**
+Yes: any endpoint that accepts a JSON POST works. [`examples/receiver.py`](examples/receiver.py) is about 300 lines of standard-library Python and a good starting point.
+
+## Install from source
+
+Clone the repository, open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose the repository folder. This runs the code on `main`, which may be ahead of the Chrome Web Store version.
+
+## Data format
 
 The extension POSTs one **JSON** record per request (or per WebSocket/SSE event). `kind` says which shape it has; receivers written for older versions can treat a record without `kind` as `"http"`.
 
-#### HTTP records (`"kind": "http"`)
+### HTTP records (`"kind": "http"`)
 
 | FIELD             | TYPE | NOTE |
 | ----------------- | ---- | ---- |
@@ -133,7 +170,7 @@ The extension POSTs one **JSON** record per request (or per WebSocket/SSE event)
 - When a body is over the **Max body** limit, `response_body` becomes `{ "body": null, "base64Encoded": …, "omitted": "too_large", "length": <characters> }`, and the request gets `"postData": null, "postDataOmitted": "too_large", "postDataLength": <characters>`.
 - A response streamed with `fetch()` (rather than EventSource) arrives as one HTTP record once it finishes.
 
-#### WebSocket records (`"kind": "websocket"`, when turned on)
+### WebSocket records (`"kind": "websocket"`, when turned on)
 
 Every record has `schema_version`, `kind`, `request_id` (one per socket), `tab_id`, `target_type`, `url` and `timestamp` (milliseconds since the epoch), plus `event`:
 
@@ -146,9 +183,20 @@ Every record has `schema_version`, `kind`, `request_id` (one per socket), `tab_i
 
 Records of one socket are sent in order. With redaction on, the handshake's credential headers are redacted; message data is not.
 
-#### EventSource records (`"kind": "sse"`, when turned on)
+### EventSource records (`"kind": "sse"`, when turned on)
 
 `schema_version`, `kind`, `event: "message"`, `request_id` (one per stream), `tab_id`, `target_type`, `url`, `document_url`, `timestamp`, `event_name`, `event_id` and `data` (with the same size-limit marker). The EventSource request itself doesn't produce an HTTP record.
+
+## How it works
+
+Extensions can watch requests with `chrome.webRequest`, but it never exposes response bodies. The usual workarounds each miss something: injecting a script that wraps `fetch` and `XMLHttpRequest` can't see requests made before it runs, and `chrome.devtools.network` only works while DevTools is open.
+
+Request Pipeline uses [`chrome.debugger`](https://developer.chrome.com/docs/extensions/reference/api/debugger) instead, which speaks the [Chrome DevTools Protocol](https://chromedevtools.github.io/devtools-protocol/tot/Network/) to the tab:
+
+1. It attaches to the tab and sends `Network.enable`.
+2. `Network.requestWillBeSent` gives the request, `Network.responseReceived` the response, and `Network.loadingFinished` signals the end. The extension then reads the body with `Network.getResponseBody`, the cookies with `Network.getCookies` and, for bodies too large to be inlined, the request body with `Network.getRequestPostData`, and sends one record.
+3. Cross-site iframes and workers are separate debugging targets that the tab's session doesn't see. `Target.setAutoAttach` attaches to each one as it starts, pausing it until its network tracking is on, so their requests are captured too (1.3).
+4. WebSocket frames (`Network.webSocketFrameSent` / `Received`) and EventSource messages (`Network.eventSourceMessageReceived`) are forwarded as their own records when turned on (1.3).
 
 ## Development
 
@@ -169,29 +217,24 @@ npm run test:e2e   # browser tests: loads the extension in Chromium and drives t
 - **Website**: `site/` holds the product page, privacy policy and terms. `npm run build-site` assembles it into `dist/site` with self-hosted fonts (the site's own files load nothing from other domains, and `test/site.test.js` checks that), and the Pages workflow publishes it whenever it changes on `main`. The domain is served through Cloudflare, which adds its own Web Analytics and bot protection to the pages; the privacy policy discloses both, so update it if those Cloudflare settings change.
 - **Packaging** follows what the manifest actually loads, so only those files go into the zip; a reference to a missing file fails the build.
 
-CI runs all of the above on every pull request, with the browser tests on the unzipped package.
+CI runs all of the above on every pull request, with the browser tests on the unzipped package. Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
 ### Releasing
 
 1. Set `version` in `manifest.json`, and in `CHANGELOG.md` change the section heading from `Unreleased` to today's date.
-2. Merge, then tag `main` and push the tag: `git tag v1.2.0 && git push origin v1.2.0`.
+2. Merge, then tag `main` and push the tag: `git tag v1.3.0 && git push origin v1.3.0`.
 3. The release workflow checks that the tag, `manifest.json` and `CHANGELOG.md` agree, runs the checks, and publishes a GitHub release with the zip attached and the changelog section as notes.
 4. Upload that zip in the [Chrome Web Store developer dashboard](https://chrome.google.com/webstore/devconsole).
 
 The Store listing text (description, permission justifications) is in `store/listing.md`, and its screenshots and promo tiles in `store/images/`. When the popup changes, regenerate the images from the version being published: unzip it, then run `EXTENSION_DIR=<that folder> npm run store-assets`.
 
-## reference
+## Credits
 
-https://developer.chrome.com/docs/extensions/reference/#stable_apis
+- Icon: [Pipeline icons created by Becris - Flaticon](https://www.flaticon.com/free-icons/pipeline)
+- [Chrome Extension: "No resource with given identifier found" when trying to Network.getResponseBody](https://stackoverflow.com/questions/47962104/chrome-extension-no-resource-with-given-identifier-found-when-trying-to-netwo)
+- [Chrome Extension - How to get HTTP Response Body?](https://stackoverflow.com/questions/18534771/chrome-extension-how-to-get-http-response-body)
+- References: [Chrome extension APIs](https://developer.chrome.com/docs/extensions/reference/api), [Chrome DevTools Protocol: Network](https://chromedevtools.github.io/devtools-protocol/tot/Network/)
 
-https://chromedevtools.github.io/devtools-protocol/tot/Network/
+## License
 
-
-
-## Thanks
-
-[Pipeline icons created by Becris - Flaticon](https://www.flaticon.com/free-icons/pipeline)
-
-[Chrome Extension: "No resource with given identifier found" when trying to Network.getResponseBody](https://stackoverflow.com/questions/47962104/chrome-extension-no-resource-with-given-identifier-found-when-trying-to-netwo)
-
-[Chrome Extension - How to get HTTP Response Body?](https://stackoverflow.com/questions/18534771/chrome-extension-how-to-get-http-response-body)
+[GPL-3.0](LICENSE)
